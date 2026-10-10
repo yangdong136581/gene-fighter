@@ -1,0 +1,4920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gene Fighter - 基因战机</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0a0a12;
+  overflow: hidden;
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  cursor: none;
+  user-select: none;
+}
+
+body.menu-active { cursor: default; }
+
+button, .btn-main, .btn-icon, .weapon-btn, input, label { cursor: pointer; }
+
+#gameCanvas {
+  display: block;
+  position: fixed;
+  top: 0; left: 0;
+  width: 100vw; height: 100vh;
+}
+
+/* HUD */
+#hud {
+  position: fixed; top: 0; left: 0; right: 0;
+  display: flex; justify-content: space-between;
+  padding: 12px 24px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+  z-index: 10; pointer-events: none;
+}
+.hud-left, .hud-right { display: flex; gap: 24px; }
+.hud-item { display: flex; flex-direction: column; align-items: center; }
+.hud-label { font-size: 10px; color: #8af; letter-spacing: 2px; font-weight: 700; }
+.hud-value { font-size: 22px; color: #fff; font-weight: 900; text-shadow: 0 0 12px #4af; }
+
+/* 基因掠夺栏 */
+#gene-bar {
+  position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 6px; z-index: 5; pointer-events: none;
+}
+.gene-chip {
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(8,12,26,0.82); border: 1px solid #a6f; border-radius: 14px;
+  padding: 3px 9px; font-size: 12px;
+  box-shadow: 0 0 10px rgba(160,100,255,0.35);
+  animation: genePop 0.25s ease-out;
+}
+.gene-chip b { color: #fff; font-weight: 700; }
+@keyframes genePop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* HP Bar */
+#hp-bar-container {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  width: 300px; height: 18px;
+  background: rgba(255,0,0,0.15);
+  border: 2px solid rgba(255,80,80,0.5);
+  border-radius: 9px; overflow: hidden;
+  z-index: 10; pointer-events: none;
+}
+#hp-bar {
+  height: 100%; width: 100%;
+  background: linear-gradient(90deg, #f44, #ff6b6b);
+  border-radius: 7px;
+  transition: width 0.2s ease;
+  box-shadow: 0 0 12px rgba(255,68,68,0.6);
+}
+#shield-bar {
+  position: absolute; top: 0; left: 0;
+  height: 100%; width: 0%;
+  background: linear-gradient(90deg, rgba(68,170,255,0.5), rgba(100,200,255,0.3));
+  border-radius: 7px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 12px rgba(68,170,255,0.4);
+}
+#hp-text {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: #fff; font-weight: 700;
+  text-shadow: 0 1px 3px #000;
+}
+
+/* Wave Announce */
+#wave-announce {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  text-align: center; z-index: 20; pointer-events: none;
+  animation: waveIn 2.5s ease forwards;
+}
+#wave-announce.hidden { display: none; }
+.wave-text { font-size: 64px; font-weight: 900; color: #fff; text-shadow: 0 0 40px #4af, 0 0 80px #28f; letter-spacing: 8px; }
+.wave-sub { font-size: 18px; color: #8cf; margin-top: 8px; letter-spacing: 3px; }
+
+@keyframes waveIn {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(2); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+}
+
+/* Damage Numbers */
+#damage-layer {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 15;
+}
+.dmg-num {
+  position: absolute;
+  font-size: 16px; font-weight: 900;
+  color: #ff4; text-shadow: 0 0 6px #fa0, 0 1px 2px #000;
+  animation: dmgFloat 0.8s ease-out forwards;
+  pointer-events: none;
+}
+.dmg-num.crit { font-size: 24px; color: #f44; text-shadow: 0 0 10px #f00; }
+.dmg-num.heal { color: #4f4; text-shadow: 0 0 6px #0f0; }
+
+@keyframes dmgFloat {
+  0% { opacity: 1; transform: translateY(0) scale(1.2); }
+  100% { opacity: 0; transform: translateY(-40px) scale(0.8); }
+}
+
+/* ═══ Loadout Screen ═══ */
+#loadout-screen {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column;
+  align-items: center;
+  background: radial-gradient(ellipse at center, rgba(8,12,30,0.97) 0%, rgba(3,3,10,0.99) 100%);
+  z-index: 200;
+  padding: 20px 40px;
+  overflow-y: auto;
+}
+#loadout-screen.hidden { display: none; }
+
+.loadout-title {
+  font-size: 48px; font-weight: 900; color: #fff;
+  text-shadow: 0 0 30px #4af, 0 0 60px #28f;
+  letter-spacing: 10px; margin-top: 10px;
+}
+.loadout-subtitle {
+  font-size: 14px; color: #568; letter-spacing: 10px; font-weight: 300;
+  margin-bottom: 20px;
+}
+.loadout-header {
+  display: flex; align-items: center; gap: 16px;
+  position: relative;
+}
+.btn-lang {
+  position: absolute; right: -60px; top: 10px;
+  padding: 6px 14px;
+  background: rgba(40, 60, 120, 0.3);
+  border: 1px solid rgba(80, 130, 220, 0.3);
+  border-radius: 6px;
+  color: #8ab; font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-lang:hover { background: rgba(50, 80, 160, 0.4); color: #fff; }
+
+.loadout-body {
+  display: flex; gap: 24px;
+  width: 100%; max-width: 960px;
+  flex: 1;
+}
+
+.loadout-left { flex: 1; min-width: 0; }
+.loadout-right {
+  width: 260px; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 8px;
+}
+
+.section-label {
+  color: #8ab; font-size: 13px; font-weight: 700;
+  letter-spacing: 2px; margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.points-remain {
+  color: #4af; font-size: 14px; font-weight: 800;
+}
+
+/* Preset Row */
+.preset-row {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.preset-btn {
+  padding: 6px 14px;
+  background: rgba(40, 60, 120, 0.3);
+  border: 1px solid rgba(80, 130, 220, 0.25);
+  border-radius: 8px;
+  color: #9ab; font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+}
+.preset-btn:hover { background: rgba(50, 80, 160, 0.4); color: #cdf; }
+.preset-btn.active {
+  background: rgba(50, 100, 220, 0.4);
+  border-color: #4af; color: #fff;
+  box-shadow: 0 0 10px rgba(68, 170, 255, 0.3);
+}
+
+/* Stat Grid */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; margin-bottom: 12px; }
+
+.alloc-row {
+  display: flex; align-items: center; gap: 4px;
+  padding: 2px 0;
+}
+.alloc-icon { font-size: 14px; width: 20px; text-align: center; }
+.alloc-label {
+  width: 32px; color: #8aa; font-size: 11px; font-weight: 600;
+}
+.alloc-btn {
+  width: 28px; height: 28px;
+  background: rgba(60, 80, 140, 0.4);
+  border: 1px solid rgba(100, 160, 255, 0.3);
+  border-radius: 6px;
+  color: #8cf; font-size: 16px; font-weight: 700;
+  cursor: pointer; transition: all 0.15s;
+  display: flex; align-items: center; justify-content: center;
+}
+.alloc-btn:hover { background: rgba(80, 120, 200, 0.5); color: #fff; }
+.alloc-btn:active { transform: scale(0.9); }
+.alloc-btn.disabled { opacity: 0.3; cursor: not-allowed; }
+
+.alloc-bar-wrap {
+  flex: 1; height: 10px;
+  background: rgba(40, 60, 100, 0.3);
+  border-radius: 5px; overflow: hidden;
+  position: relative;
+}
+.alloc-bar {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.2s, background 0.3s;
+}
+.alloc-val {
+  width: 24px; text-align: center;
+  color: #4af; font-size: 14px; font-weight: 800;
+}
+
+/* ═══ 加点卡牌 ═══ */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(146px, 1fr));
+  gap: 8px; margin-bottom: 12px;
+}
+.stat-card {
+  background: rgba(20, 35, 70, 0.45);
+  border: 1px solid rgba(80, 130, 220, 0.22);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex; flex-direction: column; gap: 5px;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+.stat-card:hover { background: rgba(30, 50, 100, 0.5); border-color: rgba(120, 180, 255, 0.5); }
+.stat-card.has-pts {
+  border-color: var(--card-color, #4af);
+  box-shadow: inset 0 0 12px rgba(80, 150, 255, 0.08), 0 0 6px rgba(80, 150, 255, 0.12);
+}
+.stat-card-head { display: flex; align-items: center; gap: 6px; }
+.stat-card-icon { display: flex; align-items: center; }
+.stat-card-name { flex: 1; color: #cde; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+.stat-card-tag {
+  font-size: 9px; color: #7cba9a; font-weight: 700;
+  border: 1px solid rgba(110, 200, 150, 0.45); border-radius: 4px;
+  padding: 0 3px; letter-spacing: 1px;
+}
+.stat-card-val { color: #4af; font-size: 14px; font-weight: 800; min-width: 18px; text-align: right; }
+.stat-card.has-pts .stat-card-val { color: var(--card-color, #4af); }
+.stat-card-desc { color: #789; font-size: 10px; line-height: 1.4; min-height: 28px; }
+.stat-card-bar-wrap { height: 6px; background: rgba(40, 60, 100, 0.4); border-radius: 3px; overflow: hidden; }
+.stat-card-bar { height: 100%; border-radius: 3px; transition: width 0.2s; }
+.stat-card-btns { display: flex; gap: 6px; }
+.stat-card-btns .alloc-btn { flex: 1; width: auto; height: 24px; font-size: 14px; line-height: 1; }
+
+/* 波次间卡牌弹窗 */
+.wave-card-grid {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  max-width: 860px; width: 92%;
+  max-height: 58vh; overflow-y: auto; padding: 4px;
+  margin-bottom: 12px;
+}
+
+/* Preview */
+.preview-weapon-name {
+  font-size: 22px; font-weight: 800; color: #fff;
+  text-shadow: 0 0 15px rgba(68, 170, 255, 0.5);
+  letter-spacing: 3px; margin-bottom: 12px;
+  text-align: center;
+}
+.preview-canvas-wrap {
+  width: 240px; height: 240px;
+  background: rgba(10, 15, 30, 0.6);
+  border: 1px solid rgba(80, 130, 220, 0.2);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 12px;
+}
+#preview-canvas { width: 240px; height: 240px; }
+
+.preview-stats {
+  width: 100%;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.ps-row {
+  display: flex; justify-content: space-between;
+  color: #789; font-size: 11px;
+}
+.ps-row .ps-val { color: #adf; font-weight: 700; }
+
+.preview-shape {
+  margin-top: 8px;
+  color: #68a; font-size: 11px; text-align: center;
+  letter-spacing: 1px;
+}
+
+.loadout-controls {
+  text-align: center; margin-top: 16px; padding-bottom: 20px;
+}
+.controls-info {
+  text-align: center; margin-bottom: 16px;
+}
+.controls-info p {
+  color: #556; font-size: 13px; line-height: 1.8;
+  letter-spacing: 1px;
+}
+
+.btn-main {
+  padding: 14px 52px;
+  background: linear-gradient(135deg, #28f, #4af);
+  border: none; border-radius: 12px;
+  color: #fff; font-size: 20px; font-weight: 700;
+  letter-spacing: 4px; cursor: pointer;
+  box-shadow: 0 0 30px rgba(40, 100, 255, 0.4);
+  transition: all 0.3s;
+}
+.btn-main:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 50px rgba(40, 100, 255, 0.6);
+}
+
+/* Game Over */
+#gameover-screen {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: rgba(5, 0, 0, 0.9);
+  z-index: 200;
+}
+#gameover-screen.hidden { display: none; }
+.go-title {
+  font-size: 56px; font-weight: 900; color: #f44;
+  text-shadow: 0 0 40px #f00; letter-spacing: 8px;
+  margin-bottom: 32px;
+}
+.go-stats { margin-bottom: 40px; text-align: center; }
+.go-stats p { color: #aaa; font-size: 18px; line-height: 2.2; }
+.go-stats span { color: #fff; font-weight: 700; }
+
+/* ═══ Wave Allocation Overlay ═══ */
+#wave-alloc {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: rgba(3, 5, 15, 0.85);
+  z-index: 150;
+  animation: fadeIn 0.3s ease;
+}
+#wave-alloc.hidden { display: none; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.wave-alloc-title {
+  font-size: 42px; font-weight: 900; color: #4f4;
+  text-shadow: 0 0 30px rgba(80,255,80,0.5);
+  letter-spacing: 6px; margin-bottom: 8px;
+}
+.wave-alloc-sub {
+  font-size: 18px; color: #adf; font-weight: 700; margin-bottom: 16px;
+}
+.wave-alloc-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 4px 16px; max-width: 560px; width: 90%;
+  margin-bottom: 16px;
+}
+.wave-alloc-btn {
+  margin-top: 8px; padding: 12px 40px;
+  font-size: 16px;
+}
+
+
+</style>
+</head>
+<body class="menu-active">
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- HUD 顶部信息栏 -->
+<div id="hud">
+  <div class="hud-left">
+    <div class="hud-item">
+      <span class="hud-label">WAVE</span>
+      <span id="hud-wave" class="hud-value">1</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">SCORE</span>
+      <span id="hud-score" class="hud-value">0</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">KILLS</span>
+      <span id="hud-kills" class="hud-value">0</span>
+    </div>
+  </div>
+  <div class="hud-right">
+    <div class="hud-item">
+      <span class="hud-label">WEAPON</span>
+      <span id="hud-weapon" class="hud-value">—</span>
+    </div>
+    <div class="hud-item">
+      <span class="hud-label">POINTS</span>
+      <span id="hud-points" class="hud-value">0</span>
+    </div>
+  </div>
+</div>
+
+<!-- 基因掠夺栏（封印夺取的临时能力） -->
+<div id="gene-bar"></div>
+
+<!-- 血条 -->
+<div id="hp-bar-container">
+  <div id="hp-bar"></div>
+  <div id="shield-bar" style="display:none"></div>
+  <span id="hp-text">100 / 100</span>
+</div>
+
+<!-- 波次公告 -->
+<div id="wave-announce" class="hidden">
+  <div class="wave-text">WAVE <span id="wave-num">1</span></div>
+  <div class="wave-sub" id="wave-sub"></div>
+</div>
+
+<!-- 波次间加点弹窗 -->
+<div id="wave-alloc" class="hidden">
+  <div class="wave-alloc-title" data-i18n="wave_clear">WAVE CLEAR!</div>
+  <div class="wave-alloc-sub"><span data-i18n="points_available">可用点数</span>: <span id="wave-pts">1</span></div>
+  <div class="card-grid wave-card-grid" id="wave-alloc-grid"></div>
+  <button id="wave-alloc-continue" class="btn-main wave-alloc-btn" data-i18n="continue_btn">继续</button>
+</div>
+
+<!-- 伤害数字层 -->
+<div id="damage-layer"></div>
+
+<!-- ═══ 战前装备界面 ═══ -->
+<div id="loadout-screen">
+  <div class="loadout-header">
+    <div class="loadout-title" data-i18n="game_title">GENE FIGHTER</div>
+    <div class="loadout-subtitle">GENE FIGHTER</div>
+    <button id="btn-lang" class="btn-lang" data-i18n="lang_switch">中</button>
+  </div>
+
+  <div class="loadout-body">
+    <!-- 左栏：模板选择 + 武器加点 -->
+    <div class="loadout-left">
+      <div class="section-label" data-i18n="select_preset">选择模板</div>
+      <div class="preset-row" id="preset-row"></div>
+
+      <div class="section-label">
+        <span data-i18n="loadout_cards">加点卡牌</span>
+        <span class="points-remain"><span data-i18n="points_remain">剩余</span> <span id="points-remain">15</span> / <span id="points-total">15</span> <span data-i18n="points_unit">点</span></span>
+      </div>
+      <div class="card-grid" id="card-grid"></div>
+    </div>
+
+    <!-- 右栏：预览 -->
+    <div class="loadout-right">
+      <div class="preview-weapon-name" id="preview-name">Light Pulse</div>
+      <div class="preview-canvas-wrap">
+        <canvas id="preview-canvas" width="240" height="240"></canvas>
+      </div>
+      <div class="preview-stats" id="preview-stats"></div>
+      <div class="preview-shape" id="preview-shape"></div>
+      <div class="section-label" style="margin-top:8px" data-i18n="ship_stats">飞船加点</div>
+      <div class="preview-stats" id="ship-stats"></div>
+    </div>
+  </div>
+
+  <div class="loadout-controls">
+    <div class="controls-info">
+      <p data-i18n="controls_info">WASD 移动 | 鼠标瞄准 | 左键/空格射击</p>
+    </div>
+    <button id="btn-start" class="btn-main" data-i18n="launch">出击！</button>
+  </div>
+</div>
+
+<!-- 游戏结束 -->
+<div id="gameover-screen" class="hidden">
+  <div class="go-title" data-i18n="game_over">GAME OVER</div>
+  <div class="go-stats">
+    <p><span data-i18n="wave_reached">到达波次</span>: <span id="go-wave">0</span></p>
+    <p><span data-i18n="final_score">最终分数</span>: <span id="go-score">0</span></p>
+    <p><span data-i18n="total_kills">击杀总数</span>: <span id="go-kills">0</span></p>
+  </div>
+  <button id="btn-restart" class="btn-main" data-i18n="restart">返回装备</button>
+</div>
+
+<script>
+// ===== utils.js =====
+// ═══════════════════════════════════════════════════════
+// utils.js — 数学工具 / 对象池 / 缓动函数 / 常量 / 国际化
+// ═══════════════════════════════════════════════════════
+var G = window.Game = {};
+// ── 常量 ──
+G.TWO_PI = Math.PI * 2;
+G.DEG = Math.PI / 180;
+G.RAND = Math.random;
+
+// ── SVG图标系统 ──
+G.icon = function(key, color) {
+  const c = color || '#fff';
+  const s = 16; // viewBox size
+  const paths = {
+    // 武器属性
+    power: `<path d="M3 8h7l-2-3 6 3-6 3 2-3H3z" fill="${c}"/><path d="M12 4l2 4-2 4" stroke="${c}" stroke-width="1.5" fill="none"/>`,
+    rate: `<path d="M2 5h4l1 2H2zM2 9h5l1 2H2zM2 13h4l1 2H2z" fill="${c}" opacity="0.7"/><path d="M10 8l3 0" stroke="${c}" stroke-width="2"/><path d="M12 6l2 2-2 2" stroke="${c}" stroke-width="1.5" fill="none"/>`,
+    pierce: `<line x1="2" y1="8" x2="14" y2="8" stroke="${c}" stroke-width="2"/><circle cx="5" cy="8" r="2" fill="none" stroke="${c}" stroke-width="1"/><circle cx="11" cy="8" r="2" fill="none" stroke="${c}" stroke-width="1"/>`,
+    homing: `<circle cx="8" cy="8" r="4" fill="none" stroke="${c}" stroke-width="1" stroke-dasharray="2 2"/><circle cx="8" cy="8" r="1.5" fill="${c}"/><path d="M12 4l-2 2M12 4h-3M12 4v3" stroke="${c}" stroke-width="1.2"/>`,
+    burst: `<circle cx="4" cy="8" r="2" fill="${c}"/><circle cx="8" cy="5" r="2" fill="${c}"/><circle cx="12" cy="8" r="2" fill="${c}"/><circle cx="8" cy="11" r="2" fill="${c}" opacity="0.5"/>`,
+    split: `<line x1="2" y1="8" x2="8" y2="8" stroke="${c}" stroke-width="2"/><line x1="8" y1="8" x2="13" y2="4" stroke="${c}" stroke-width="1.5"/><line x1="8" y1="8" x2="13" y2="12" stroke="${c}" stroke-width="1.5"/>`,
+    lifetime: `<rect x="4" y="3" width="8" height="10" rx="2" fill="none" stroke="${c}" stroke-width="1.5"/><line x1="8" y1="6" x2="8" y2="9" stroke="${c}" stroke-width="1.5"/><line x1="8" y1="9" x2="10" y2="10" stroke="${c}" stroke-width="1"/>`,
+    dot: `<circle cx="6" cy="8" r="3" fill="${c}" opacity="0.4"/><circle cx="10" cy="8" r="2" fill="${c}" opacity="0.7"/><circle cx="13" cy="8" r="1" fill="${c}"/>`,
+    zone: `<circle cx="8" cy="8" r="6" fill="${c}" opacity="0.15"/><circle cx="8" cy="8" r="4" fill="none" stroke="${c}" stroke-width="1" stroke-dasharray="2 1"/><circle cx="8" cy="8" r="1.5" fill="${c}"/>`,
+    bounce: `<path d="M3 12l4-4 4 4 3-6" stroke="${c}" stroke-width="1.5" fill="none"/><path d="M12 4l2 2-3 1" fill="${c}"/>`,
+    burn: `<path d="M8 2c0 4-4 5-4 8a4 4 0 008 0c0-3-4-4-4-8z" fill="${c}" opacity="0.8"/><path d="M8 8c0 2-2 2.5-2 4a2 2 0 004 0c0-1.5-2-2-2-4z" fill="#000" opacity="0.3"/>`,
+    freeze: `<line x1="8" y1="2" x2="8" y2="14" stroke="${c}" stroke-width="1.5"/><line x1="3" y1="5" x2="13" y2="11" stroke="${c}" stroke-width="1.5"/><line x1="3" y1="11" x2="13" y2="5" stroke="${c}" stroke-width="1.5"/><circle cx="8" cy="8" r="1.5" fill="${c}"/>`,
+    shock: `<path d="M9 2l-3 5h4l-3 5h5l-4 4" stroke="${c}" stroke-width="1.5" fill="none" stroke-linejoin="round"/>`,
+    lifesteal: `<path d="M8 13C4.5 10 2.5 7.8 2.5 5.7A2.8 2.8 0 018 4a2.8 2.8 0 015.5 1.7C13.5 7.8 11.5 10 8 13z" fill="${c}"/><path d="M5 8h6M8 5.5v5" stroke="#000" stroke-width="1" opacity="0.4"/>`,
+    knockback: `<circle cx="4.5" cy="8" r="2.5" fill="${c}" opacity="0.6"/><path d="M8 5l5 3-5 3z" fill="${c}"/><path d="M8 8h5" stroke="${c}" stroke-width="2"/>`,
+    seal: `<circle cx="8" cy="8" r="5.5" fill="none" stroke="${c}" stroke-width="1.3"/><path d="M6 8l1.5 1.5L10.5 6" stroke="${c}" stroke-width="1.5" fill="none"/><circle cx="8" cy="2.5" r="0.8" fill="${c}"/><circle cx="8" cy="13.5" r="0.8" fill="${c}"/><circle cx="2.5" cy="8" r="0.8" fill="${c}"/><circle cx="13.5" cy="8" r="0.8" fill="${c}"/>`,
+    charm: `<path d="M8 13C4.5 10 2.5 7.8 2.5 5.7A2.8 2.8 0 018 4a2.8 2.8 0 015.5 1.7C13.5 7.8 11.5 10 8 13z" fill="${c}" opacity="0.85"/><path d="M6 6.5l1 1.5 2-2.5" stroke="#fff" stroke-width="1" fill="none" opacity="0.7"/>`,
+    drone: `<path d="M8 5l4 3-4 3-4-3z" fill="${c}" opacity="0.8"/><circle cx="3.5" cy="4" r="1.8" fill="none" stroke="${c}" stroke-width="1"/><circle cx="12.5" cy="4" r="1.8" fill="none" stroke="${c}" stroke-width="1"/><line x1="4.5" y1="4.8" x2="6.5" y2="6.5" stroke="${c}" stroke-width="1"/><line x1="11.5" y1="4.8" x2="9.5" y2="6.5" stroke="${c}" stroke-width="1"/><line x1="8" y1="11" x2="8" y2="13.5" stroke="${c}" stroke-width="1.2"/><circle cx="8" cy="14" r="0.8" fill="${c}"/>`,
+    striker: `<path d="M13.5 8L6 4.5l1.5 3L3 8l4.5 0.5-1.5 3z" fill="${c}" opacity="0.9"/><line x1="1.5" y1="5.5" x2="4.5" y2="5.5" stroke="${c}" stroke-width="1" opacity="0.6"/><line x1="1" y1="10.5" x2="4" y2="10.5" stroke="${c}" stroke-width="1" opacity="0.6"/>`,
+    reactive: `<path d="M8 2l5 3v4c0 3-2.5 5-5 6-2.5-1-5-3-5-6V5z" fill="none" stroke="${c}" stroke-width="1.3"/><path d="M8 5.5l1.8 2.5H6.2z" fill="${c}"/><line x1="8" y1="8" x2="8" y2="11.5" stroke="${c}" stroke-width="1.3"/>`,
+    nest: `<circle cx="8" cy="9" r="5" fill="none" stroke="${c}" stroke-width="1.3"/><circle cx="6" cy="8" r="1.5" fill="${c}" opacity="0.7"/><circle cx="9.8" cy="7.5" r="1.3" fill="${c}" opacity="0.7"/><circle cx="8.5" cy="10.8" r="1.4" fill="${c}" opacity="0.7"/><path d="M4 5c1-1.5 2.5-2 4-2s3 .5 4 2" stroke="${c}" stroke-width="1" fill="none"/>`,
+    // 飞船属性
+    hull: `<path d="M8 3l5 4-5 7-5-7z" fill="none" stroke="${c}" stroke-width="1.5"/><line x1="8" y1="6" x2="8" y2="11" stroke="${c}" stroke-width="1.5"/><line x1="5.5" y1="8.5" x2="10.5" y2="8.5" stroke="${c}" stroke-width="1.5"/>`,
+    regen: `<circle cx="8" cy="8" r="5" fill="none" stroke="${c}" stroke-width="1.2"/><path d="M8 5v6M5 8h6" stroke="${c}" stroke-width="2"/>`,
+    reflect: `<path d="M3 8h3l2-4 2 8 2-4h3" stroke="${c}" stroke-width="1.5" fill="none" stroke-linejoin="round"/>`,
+    shield: `<path d="M8 2l5 3v4c0 3-2.5 5-5 6-2.5-1-5-3-5-6V5z" fill="${c}" opacity="0.2" stroke="${c}" stroke-width="1.5"/>`,
+    guard: `<circle cx="8" cy="8" r="2.5" fill="${c}" opacity="0.8"/><circle cx="8" cy="8" r="5.5" fill="none" stroke="${c}" stroke-width="1" stroke-dasharray="2.5 2"/><circle cx="13.5" cy="8" r="1.3" fill="${c}"/><circle cx="4" cy="11.5" r="1.3" fill="${c}" opacity="0.7"/>`,
+    // 基因掠夺（敌人特质）
+    gene: `<path d="M5 2c0 5 6 7 6 12M11 2c0 5-6 7-6 12" stroke="${c}" stroke-width="1.3" fill="none"/><line x1="6" y1="5" x2="10" y2="5" stroke="${c}" stroke-width="1"/><line x1="6" y1="11" x2="10" y2="11" stroke="${c}" stroke-width="1"/>`,
+    fast: `<path d="M2 5h7M2 8h9M2 11h7" stroke="${c}" stroke-width="1.5"/><path d="M11 5l3 3-3 3" stroke="${c}" stroke-width="1.5" fill="none"/>`,
+    teleporter: `<ellipse cx="8" cy="8" rx="3" ry="6" fill="none" stroke="${c}" stroke-width="1.3"/><circle cx="8" cy="8" r="1" fill="${c}"/><path d="M3 4l2 1M13 4l-2 1M3 12l2-1M13 12l-2-1" stroke="${c}" stroke-width="1"/>`,
+    phaser: `<path d="M4 13V7a4 4 0 018 0v6l-2-1.5L8 13l-2-1.5L4 13z" fill="${c}" opacity="0.8"/><circle cx="6.5" cy="7" r="0.8" fill="#000" opacity="0.5"/><circle cx="9.5" cy="7" r="0.8" fill="#000" opacity="0.5"/>`,
+    swarm: `<circle cx="4" cy="6" r="1.8" fill="${c}"/><circle cx="9" cy="4" r="1.4" fill="${c}" opacity="0.8"/><circle cx="12" cy="8" r="1.6" fill="${c}"/><circle cx="6" cy="11" r="1.4" fill="${c}" opacity="0.8"/><circle cx="11" cy="12" r="1.2" fill="${c}" opacity="0.6"/>`,
+    reviver: `<path d="M8 13C4.5 10 2.5 7.8 2.5 5.7A2.8 2.8 0 018 4a2.8 2.8 0 015.5 1.7C13.5 7.8 11.5 10 8 13z" fill="${c}"/><path d="M8 5.5v4M6 7.5h4" stroke="#fff" stroke-width="1.2"/>`,
+    bubble: `<circle cx="8" cy="8" r="5.5" fill="none" stroke="${c}" stroke-width="1.3"/><circle cx="6" cy="6" r="1.2" fill="${c}" opacity="0.5"/><path d="M11.8 9.2a4 4 0 000.7-2" stroke="${c}" stroke-width="1" fill="none" opacity="0.7"/>`,
+    timelurker: `<path d="M4.5 2.5h7M4.5 13.5h7M5.5 2.5c0 3 1.5 3.5 2.5 5.5 1-2 2.5-2.5 2.5-5.5M5.5 13.5c0-3 1.5-3.5 2.5-5.5 1 2 2.5 2.5 2.5 5.5" stroke="${c}" stroke-width="1.2" fill="none"/>`,
+    // 武器预设
+    machinegun: `<rect x="2" y="6" width="12" height="4" rx="1" fill="none" stroke="${c}" stroke-width="1.2"/><line x1="5" y1="8" x2="7" y2="8" stroke="${c}" stroke-width="1"/><rect x="10" y="4" width="2" height="2" fill="${c}" opacity="0.5"/>`,
+    shotgun: `<path d="M2 8h6" stroke="${c}" stroke-width="2"/><line x1="8" y1="8" x2="13" y2="4" stroke="${c}" stroke-width="1.2"/><line x1="8" y1="8" x2="14" y2="7" stroke="${c}" stroke-width="1.2"/><line x1="8" y1="8" x2="14" y2="10" stroke="${c}" stroke-width="1.2"/><line x1="8" y1="8" x2="13" y2="12" stroke="${c}" stroke-width="1.2"/>`,
+    laser: `<line x1="2" y1="8" x2="14" y2="8" stroke="${c}" stroke-width="2.5" opacity="0.8"/><line x1="2" y1="8" x2="14" y2="8" stroke="#fff" stroke-width="1" opacity="0.5"/><circle cx="14" cy="8" r="2" fill="${c}" opacity="0.4"/>`,
+    rocket: `<path d="M3 9l3-3h5l3 2-3 2H6z" fill="none" stroke="${c}" stroke-width="1.3"/><path d="M3 9l-1 3 3-2z" fill="${c}" opacity="0.6"/><circle cx="12" cy="8" r="1" fill="${c}"/>`,
+    plasma: `<circle cx="8" cy="8" r="4" fill="${c}" opacity="0.25"/><circle cx="8" cy="8" r="2.5" fill="${c}" opacity="0.5"/><circle cx="8" cy="8" r="1" fill="${c}"/>`,
+    sniper: `<circle cx="8" cy="8" r="5" fill="none" stroke="${c}" stroke-width="1"/><line x1="8" y1="2" x2="8" y2="14" stroke="${c}" stroke-width="0.8"/><line x1="2" y1="8" x2="14" y2="8" stroke="${c}" stroke-width="0.8"/><circle cx="8" cy="8" r="1.5" fill="${c}"/>`,
+  };
+  const path = paths[key] || `<circle cx="8" cy="8" r="3" fill="${c}"/>`;
+  return `<svg viewBox="0 0 ${s} ${s}" width="16" height="16" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle">${path}</svg>`;
+};
+
+// ── 国际化系统 ──
+G.currentLang = localStorage.getItem('game-lang') || 'en';
+
+G.i18n = {
+  zh: {
+    // 主界面
+    game_title: '基因战机', game_subtitle: 'GENE FIGHTER',
+    select_preset: '选择模板', weapon_stats: '武器加点',
+    ship_stats: '飞船加点', points_remain: '剩余', points_unit: '点',
+    launch: '出击！', controls_info: 'WASD 移动 | 鼠标瞄准 | 左键/空格射击',
+    // 波次
+    wave_clear: 'WAVE CLEAR!', points_available: '可用点数',
+    continue_btn: '继续', boss_wave: '⚠ BOSS WAVE ⚠',
+    enemies_incoming: '敌人来袭',
+    // HUD
+    hud_wave: 'WAVE', hud_score: 'SCORE', hud_kills: 'KILLS',
+    hud_weapon: 'WEAPON', hud_points: 'POINTS',
+    // 游戏结束
+    game_over: 'GAME OVER', wave_reached: '到达波次',
+    final_score: '最终分数', total_kills: '击杀总数',
+    restart: '返回装备',
+    // 武器属性
+    stat_power: '威力', stat_rate: '射速', stat_pierce: '穿透',
+    stat_homing: '跟踪', stat_burst: '弹数', stat_split: '分裂',
+    stat_lifetime: '飞行', stat_dot: '毒药', stat_zone: '区域',
+    stat_bounce: '弹射', stat_burn: '燃烧', stat_freeze: '冰冻', stat_shock: '感电',
+    stat_lifesteal: '吸血', stat_knockback: '击退', stat_seal: '封印', stat_charm: '魅惑',
+        stat_drone: '无人机',
+        stat_striker: '进攻无人机',
+    // 加点卡牌
+    loadout_cards: '加点卡牌', ship_tag: '飞船',
+    stat_desc_power: '每点伤害+8', stat_desc_rate: '每点射速+1.8/秒',
+    stat_desc_pierce: '每点子弹多穿透1个敌人', stat_desc_homing: '每点子弹追踪强度+8%：动态追踪正前方最近的敌人，不锁死单一目标',
+    stat_desc_burst: '每点每次射击多1颗子弹', stat_desc_split: '每点命中后多分裂1颗子弹',
+    stat_desc_lifetime: '每点子弹飞行时间+0.5秒', stat_desc_dot: '命中施加慢性毒药：固定4伤害/秒，每点增加4秒持续时间；重复命中只刷新时长，伤害不增加',
+    stat_desc_zone: '每点命中生成区域，半径+14', stat_desc_bounce: '每点子弹在敌人间弹射+1次',
+    stat_desc_burn: '点燃敌人：每点基础灼烧4/秒，灼烧伤害随燃烧时长每秒+100%（最高600%）；重复命中只刷新时长，不叠加', stat_desc_freeze: '冰冻子弹命中必叠加冰冻值：每击+(5+5×点)%，冰冻值=减速百分比，每秒自动-10%；满100%冰冻目标2秒并清零',
+    stat_desc_shock: '命中必触发感电连锁：闪电向附近敌人跳跃点数次，每跳造成40%子弹伤害（逐跳衰减）并施加3秒50%减速', stat_desc_lifesteal: '每次命中按点数回复生命',
+    stat_desc_knockback: '命中将敌人推离', stat_desc_seal: '命中叠加子弹伤害30%的封印，满值吸收目标并夺取其基因能力，每点持续10秒',
+    stat_desc_charm: '命中叠加伤害10%的魅惑，满值将敌人转为友军；每点友军回复+1/秒',
+        stat_desc_drone: '每点+1架无人机替代基础射击：按住左键朝准星移动，自动射击最近敌人（发射母船子弹），撞击敌人造成接触伤害；血量=母船5%，死亡后5秒从母船重生。封印+魅惑同加点时合并为叠加态：满值先魅惑20×魅惑点×魅惑比例秒，随后封印夺基因（10×封印点×封印比例秒）',
+        stat_desc_striker: '每点+1架进攻无人机：单击发射键出击（无需按住），自动冲锋攻击离母船最近的敌人，每轮冲锋1秒内突进并连射母船子弹（自动规避伤害），每次出击攻击两轮直到弹药耗尽，随后返回母舰补给弹药、3秒后停泊待命等待下次指令；移速减半、无碰撞伤害（只会受到伤害）；非冲锋无法射击但可主动规避伤害（持续1秒，冷却1秒）；血量=母船5%，死亡后5秒从母船重生',
+    // 基因掠夺
+    gene_title: '基因',
+    gene_normal: '基因·强化', gene_tank: '基因·坚韧', gene_fast: '基因·迅捷', gene_healer: '基因·再生',
+    gene_splitter: '基因·分裂', gene_shielded: '基因·护盾', gene_explosive: '基因·爆燃', gene_teleporter: '基因·闪现',
+    gene_phaser: '基因·相位', gene_reflector: '基因·反射', gene_swarm: '基因·狂暴', gene_reviver: '基因·复苏',
+    gene_bubble: '基因·棘壳', gene_timelurker: '基因·时滞', gene_nest: '基因·繁育',
+    fx_charmed: '魅惑!', fx_downed: '倒下', fx_revived: '复活!',
+    // 飞船属性
+    ship_hull: '血量', ship_regen: '回复', ship_reflect: '反伤', ship_shield: '护盾', ship_reactive: '反应装甲', ship_guard: '防御无人机',
+    ship_desc_hull: '每点最大生命+25', ship_desc_regen: '每点每秒回血+2',
+    ship_desc_reflect: '每点受伤反弹+3', ship_desc_shield: '每点护盾+15',
+    ship_desc_reactive: '每次受到伤害触发点数次反应，每次向伤害源发射一整轮武器齐射（继承弹数与全部词条：封印/魅惑/元素等，伤害减半）',
+    ship_desc_guard: '每点+1架防御无人机（圆形小飞船），继承10%母船属性（血量/护盾/反伤/反应装甲/回复），不可攻击，每秒回复20%血量；优先集中在母船前方（朝向准星）扇形护卫，某架被摧毁后其余机迅速补位',
+    // 预览
+    preview_damage: '伤害', preview_rate: '射速', preview_pierce: '穿透',
+    preview_homing: '跟踪', preview_burst: '弹数', preview_split: '分裂',
+    preview_lifetime: '飞行', preview_dot: '慢性毒药', preview_zone: '区域',
+    preview_bounce: '弹射', preview_burn: '🔥燃烧', preview_freeze: '❄冰冻',
+    preview_shock: '⚡感电',
+    preview_hp: '❤ 血量', preview_regen: '💚 回复',
+    preview_reflect: '🛡 反伤', preview_shield: '🔰 护盾', preview_reactive: '⚡ 反应装甲',
+    preview_guard: '🛸 防御无人机',
+    preview_drone: '🛨 无人机',
+    preview_striker: '✈ 进攻无人机',
+    // 形态
+    shape_orb: '能量球', shape_streak: '光束', shape_needle: '穿甲针',
+    shape_crescent: '月牙', shape_star: '星形弹', shape_cluster: '簇状弹',
+    shape_dart: '飞镖', shape_label: '形态',
+    // 语言
+    lang_switch: 'EN',
+    // 预设武器名
+    preset_machinegun: '机枪', preset_shotgun: '散弹', preset_laser: '激光',
+    preset_rocket: '火箭', preset_plasma: '等离子', preset_sniper: '狙击',
+  },
+  en: {
+    game_title: 'GENE FIGHTER', game_subtitle: 'GENE FIGHTER',
+    select_preset: 'Select Preset', weapon_stats: 'Weapon Stats',
+    ship_stats: 'Ship Stats', points_remain: 'Remaining', points_unit: 'pts',
+    launch: 'LAUNCH!', controls_info: 'WASD move | Mouse aim | Click/Space fire',
+    wave_clear: 'WAVE CLEAR!', points_available: 'Points Available',
+    continue_btn: 'Continue', boss_wave: '⚠ BOSS WAVE ⚠',
+    enemies_incoming: 'enemies incoming',
+    hud_wave: 'WAVE', hud_score: 'SCORE', hud_kills: 'KILLS',
+    hud_weapon: 'WEAPON', hud_points: 'POINTS',
+    game_over: 'GAME OVER', wave_reached: 'Wave Reached',
+    final_score: 'Final Score', total_kills: 'Total Kills',
+    restart: 'Back to Loadout',
+    stat_power: 'Power', stat_rate: 'Rate', stat_pierce: 'Pierce',
+    stat_homing: 'Homing', stat_burst: 'Burst', stat_split: 'Split',
+    stat_lifetime: 'Range', stat_dot: 'Poison', stat_zone: 'Zone',
+    stat_bounce: 'Bounce', stat_burn: 'Burn', stat_freeze: 'Freeze', stat_shock: 'Shock',
+stat_lifesteal: 'Lifesteal', stat_knockback: 'Knockback', stat_seal: 'Seal', stat_charm: 'Charm',
+    stat_drone: 'Drone',
+    stat_striker: 'Striker',
+    loadout_cards: 'Stat Cards', ship_tag: 'SHIP',
+    stat_desc_power: '+8 damage per point', stat_desc_rate: '+1.8 shots/sec per point',
+    stat_desc_pierce: '+1 pierce per point', stat_desc_homing: '+8% homing strength per point: bullets dynamically track the nearest enemy straight ahead instead of locking onto one target',
+    stat_desc_burst: '+1 bullet per shot per point', stat_desc_split: '+1 split bullet on hit per point',
+    stat_desc_lifetime: '+0.5s bullet flight per point', stat_desc_dot: 'Hits apply chronic poison: fixed 4 damage/s; each point adds +4s duration; re-hits only refresh the timer and never add damage',
+    stat_desc_zone: 'Hits create zones, +14 radius per point', stat_desc_bounce: '+1 ricochet between enemies per point',
+    stat_desc_burn: 'Ignites enemies: 4 base burn/s per point; burn damage grows +100% per second while burning (up to 600%); re-hits only refresh the duration and never stack', stat_desc_freeze: 'Freeze bullets always stack chill on hit: +(5+5×pts)% per hit; the stack equals the slow percentage and decays 10% per second; at 100% the target is frozen solid for 2s and the stack resets',
+    stat_desc_shock: 'Hits always arc shock lightning: jumps to nearby enemies [points] times, each hop dealing 40% bullet damage (decaying per hop) and applying a 3s 50% slow', stat_desc_lifesteal: 'Heals per point on each hit',
+    stat_desc_knockback: 'Hits shove enemies away', stat_desc_seal: 'Hits stack 30% of damage as seal; full = absorb target and steal its gene for 10s per point',
+    stat_desc_charm: 'Hits stack 10% of damage as charm; full = enemy becomes ally; +1 HP/s per point',
+    stat_desc_drone: '+1 drone per point replaces base firing: hold left click to fly toward the crosshair, auto-fires at the nearest enemy with the mothership weapon, and rams enemies for contact damage; HP = 5% of ship, respawns from the ship 5s after death. With both Seal & Charm, they merge into a Hybrid state: full = charmed for 20×charm pts×charm share sec, then sealed for a gene of 10×seal pts×seal share sec',
+    stat_desc_striker: '+1 striker drone per point: a single press of the fire button launches it (no need to hold), auto charge-attacking the enemy nearest to the mothership — each 1s charge dashes and rapid-fires the ship weapon (auto-evading damage); each sortie attacks two rounds until ammo is spent, then returns to the mothership to resupply and docks after 3s awaiting the next command; half movement speed and no ramming damage (can only take hits); outside a charge it cannot shoot but can actively evade damage (1s evade, 1s cooldown); HP = 5% of ship, respawns 5s after death',
+    gene_title: 'GENE',
+    gene_normal: 'Gene: Power', gene_tank: 'Gene: Bulwark', gene_fast: 'Gene: Swift', gene_healer: 'Gene: Regen',
+    gene_splitter: 'Gene: Split', gene_shielded: 'Gene: Shield', gene_explosive: 'Gene: Blast', gene_teleporter: 'Gene: Blink',
+    gene_phaser: 'Gene: Phase', gene_reflector: 'Gene: Reflect', gene_swarm: 'Gene: Frenzy', gene_reviver: 'Gene: Revive',
+    gene_bubble: 'Gene: Thorn', gene_timelurker: 'Gene: Stasis', gene_nest: 'Gene: Brood',
+fx_charmed: 'Charmed!', fx_downed: 'Downed', fx_revived: 'Revived!',
+    ship_hull: 'Hull', ship_regen: 'Regen', ship_reflect: 'Reflect', ship_shield: 'Shield', ship_reactive: 'Reactive Armor', ship_guard: 'Guard Drones',
+    ship_desc_hull: '+25 max HP per point', ship_desc_regen: '+2 HP/s regen per point',
+    ship_desc_reflect: '+3 damage reflect per point', ship_desc_shield: '+15 shield per point',
+    ship_desc_reactive: 'Every hit taken triggers [points] reactions, each firing a full weapon volley toward the damage source (inherits burst count and all mods: seal/charm/elements, half damage)',
+    ship_desc_guard: '+1 guard drone per point (small round craft) inheriting 10% of ship stats (HP/shield/reflect/reactive/regen); cannot attack; regenerates 20% HP per second; they concentrate in a fan formation in front of the ship (toward the crosshair), and when one is destroyed the others quickly shift to close the gap',
+    preview_damage: 'Damage', preview_rate: 'Fire Rate', preview_pierce: 'Pierce',
+    preview_homing: 'Homing', preview_burst: 'Burst', preview_split: 'Split',
+    preview_lifetime: 'Range', preview_dot: 'Chronic Poison', preview_zone: 'Zone',
+    preview_bounce: 'Bounce', preview_burn: '🔥Burn', preview_freeze: '❄Freeze',
+    preview_shock: '⚡Shock',
+    preview_hp: '❤ HP', preview_regen: '💚 Regen',
+    preview_reflect: '🛡 Reflect', preview_shield: '🔰 Shield', preview_reactive: '⚡ Reactive',
+    preview_guard: '🛸 Guards',
+    preview_drone: '🛨 Drones',
+    preview_striker: '✈ Strikers',
+    shape_orb: 'Orb', shape_streak: 'Beam', shape_needle: 'Needle',
+    shape_crescent: 'Crescent', shape_star: 'Star', shape_cluster: 'Cluster',
+    shape_dart: 'Dart', shape_label: 'Shape',
+    lang_switch: '中',
+    preset_machinegun: 'Machine Gun', preset_shotgun: 'Shotgun', preset_laser: 'Laser',
+    preset_rocket: 'Rocket', preset_plasma: 'Plasma', preset_sniper: 'Sniper',
+  },
+};
+
+G.t = function(key) {
+  return (G.i18n[G.currentLang] && G.i18n[G.currentLang][key]) || G.i18n.zh[key] || key;
+};
+
+G.applyLang = function(lang) {
+  if (lang) G.currentLang = lang;
+  localStorage.setItem('game-lang', G.currentLang);
+  document.documentElement.lang = G.currentLang;
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.dataset.i18n;
+    el.textContent = G.t(key);
+  });
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = G.t(el.dataset.i18nPlaceholder);
+  });
+};
+
+// ── 数学工具 ──
+G.lerp = (a, b, t) => a + (b - a) * t;
+G.clamp = (v, min, max) => v < min ? min : v > max ? max : v;
+G.dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
+G.angle = (x1, y1, x2, y2) => Math.atan2(y2 - y1, x2 - x1);
+G.randFloat = (min, max) => G.RAND() * (max - min) + min;
+G.randInt = (min, max) => Math.floor(G.RAND() * (max - min + 1)) + min;
+G.randSign = () => G.RAND() < 0.5 ? -1 : 1;
+
+G.angleDiff = (a, b) => {
+  let d = ((b - a) % G.TWO_PI + G.TWO_PI + Math.PI) % G.TWO_PI - Math.PI;
+  return d;
+};
+
+G.rotatePoint = (x, y, cx, cy, angle) => {
+  const cos = Math.cos(angle), sin = Math.sin(angle);
+  const dx = x - cx, dy = y - cy;
+  return { x: cx + dx * cos - dy * sin, y: cy + dx * sin + dy * cos };
+};
+
+// ── 缓动函数 ──
+G.ease = {
+  outCubic: t => 1 - Math.pow(1 - t, 3),
+  outElastic: t => t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * (2 * Math.PI / 3)) + 1,
+  outBack: t => { const c = 1.70158; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); },
+  inOutQuad: t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2,
+};
+
+// ── 颜色工具 ──
+G.hsl = (h, s, l, a = 1) => `hsla(${h},${s}%,${l}%,${a})`;
+G.hexToRgb = (hex) => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return { r, g, b };
+};
+
+// ── 对象池 ──
+G.Pool = class Pool {
+  constructor(factory, reset, initialSize = 100) {
+    this.factory = factory;
+    this.reset = reset;
+    this.pool = [];
+    this.active = [];
+    for (let i = 0; i < initialSize; i++) {
+      this.pool.push(factory());
+    }
+  }
+
+  get() {
+    const obj = this.pool.length > 0 ? this.pool.pop() : this.factory();
+    obj.alive = true;
+    this.active.push(obj);
+    return obj;
+  }
+
+  release(obj) {
+    obj.alive = false;
+    const idx = this.active.indexOf(obj);
+    if (idx !== -1) {
+      this.active.splice(idx, 1);
+      this.reset(obj);
+      this.pool.push(obj);
+    }
+  }
+
+  releaseAll() {
+    for (let i = this.active.length - 1; i >= 0; i--) {
+      const obj = this.active[i];
+      obj.alive = false;
+      this.reset(obj);
+      this.pool.push(obj);
+    }
+    this.active.length = 0;
+  }
+
+  update(dt, updateFn) {
+    for (let i = this.active.length - 1; i >= 0; i--) {
+      const obj = this.active[i];
+      if (!obj.alive) {
+        this.active.splice(i, 1);
+        this.reset(obj);
+        this.pool.push(obj);
+        continue;
+      }
+      updateFn(obj, dt);
+      if (!obj.alive) {
+        this.active.splice(i, 1);
+        this.reset(obj);
+        this.pool.push(obj);
+      }
+    }
+  }
+
+  get count() { return this.active.length; }
+};
+
+// ── 空间哈希（碰撞检测优化） ──
+G.SpatialHash = class SpatialHash {
+  constructor(cellSize = 64) {
+    this.cellSize = cellSize;
+    this.cells = new Map();
+  }
+
+  clear() { this.cells.clear(); }
+
+  _key(x, y) {
+    const cx = Math.floor(x / this.cellSize);
+    const cy = Math.floor(y / this.cellSize);
+    return (cx * 73856093) ^ (cy * 19349663); // hash
+  }
+
+  insert(entity) {
+    const key = this._key(entity.x, entity.y);
+    if (!this.cells.has(key)) this.cells.set(key, []);
+    this.cells.get(key).push(entity);
+  }
+
+  query(x, y, radius) {
+    const results = [];
+    const cs = this.cellSize;
+    const minCx = Math.floor((x - radius) / cs);
+    const maxCx = Math.floor((x + radius) / cs);
+    const minCy = Math.floor((y - radius) / cs);
+    const maxCy = Math.floor((y + radius) / cs);
+    for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cy = minCy; cy <= maxCy; cy++) {
+        const key = (cx * 73856093) ^ (cy * 19349663);
+        const cell = this.cells.get(key);
+        if (cell) {
+          for (let i = 0; i < cell.length; i++) {
+            results.push(cell[i]);
+          }
+        }
+      }
+    }
+    return results;
+  }
+};
+
+// ── 屏幕震动 ──
+G.ScreenShake = class ScreenShake {
+  constructor() {
+    this.intensity = 0;
+    this.duration = 0;
+    this.timer = 0;
+    this.offsetX = 0;
+    this.offsetY = 0;
+  }
+
+  trigger(intensity, duration) {
+    this.intensity = Math.max(this.intensity, intensity);
+    this.duration = Math.max(this.duration, duration);
+    this.timer = 0;
+  }
+
+  update(dt) {
+    if (this.duration <= 0) {
+      this.offsetX = 0;
+      this.offsetY = 0;
+      return;
+    }
+    this.timer += dt;
+    const progress = this.timer / this.duration;
+    const decay = 1 - progress;
+    if (progress >= 1) {
+      this.duration = 0;
+      this.intensity = 0;
+      this.offsetX = 0;
+      this.offsetY = 0;
+      return;
+    }
+    const mag = this.intensity * decay;
+    this.offsetX = (G.RAND() * 2 - 1) * mag;
+    this.offsetY = (G.RAND() * 2 - 1) * mag;
+  }
+};
+
+// ── 慢动作（击中停顿） ──
+G.HitStop = class HitStop {
+  constructor() {
+    this.timer = 0;
+    this.scale = 1;
+  }
+
+  trigger(duration, scale = 0.1) {
+    this.timer = Math.max(this.timer, duration);
+    this.scale = scale;
+  }
+
+  update(dt) {
+    if (this.timer > 0) {
+      this.timer -= dt;
+      if (this.timer <= 0) {
+        this.timer = 0;
+        this.scale = 1;
+      }
+      return this.scale;
+    }
+    return 1;
+  }
+};
+
+console.log('[Game] utils.js loaded');
+
+
+// ===== core.js =====
+// ═══════════════════════════════════════════════════════
+// core.js — 游戏循环 / 输入系统 / 事件总线 / 渲染器
+// ═══════════════════════════════════════════════════════
+// (G = window.Game)
+// ── 事件总线（Event Bus） ──
+G.EventBus = class EventBus {
+  constructor() {
+    this.listeners = new Map();
+  }
+
+  on(event, callback, priority = 0) {
+    if (!this.listeners.has(event)) this.listeners.set(event, []);
+    const list = this.listeners.get(event);
+    list.push({ callback, priority });
+    list.sort((a, b) => b.priority - a.priority);
+    return () => this.off(event, callback);
+  }
+
+  off(event, callback) {
+    const list = this.listeners.get(event);
+    if (list) {
+      const idx = list.findIndex(l => l.callback === callback);
+      if (idx !== -1) list.splice(idx, 1);
+    }
+  }
+
+  emit(event, data) {
+    const list = this.listeners.get(event);
+    if (list) {
+      for (let i = 0; i < list.length; i++) {
+        list[i].callback(data);
+      }
+    }
+  }
+};
+
+// ── 输入系统 ──
+G.Input = class Input {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.keys = new Set();
+    this.keysJustPressed = new Set();
+    this.mouse = { x: 0, y: 0, down: false, justDown: false };
+    this.scrollDelta = 0;
+
+    window.addEventListener('keydown', e => {
+      if (!this.keys.has(e.code)) this.keysJustPressed.add(e.code);
+      this.keys.add(e.code);
+      if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+        e.preventDefault();
+      }
+    });
+    window.addEventListener('keyup', e => this.keys.delete(e.code));
+
+    canvas.addEventListener('mousemove', e => {
+      this.mouse.x = e.clientX;
+      this.mouse.y = e.clientY;
+    });
+    canvas.addEventListener('mousedown', e => {
+      if (e.button === 0) { this.mouse.down = true; this.mouse.justDown = true; }
+    });
+    canvas.addEventListener('mouseup', e => {
+      if (e.button === 0) this.mouse.down = false;
+    });
+    canvas.addEventListener('wheel', e => {
+      this.scrollDelta += Math.sign(e.deltaY);
+      e.preventDefault();
+    }, { passive: false });
+
+    // prevent context menu
+    canvas.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  isDown(code) { return this.keys.has(code); }
+  justPressed(code) { return this.keysJustPressed.has(code); }
+
+  get movement() {
+    let dx = 0, dy = 0;
+    if (this.isDown('KeyW') || this.isDown('ArrowUp')) dy -= 1;
+    if (this.isDown('KeyS') || this.isDown('ArrowDown')) dy += 1;
+    if (this.isDown('KeyA') || this.isDown('ArrowLeft')) dx -= 1;
+    if (this.isDown('KeyD') || this.isDown('ArrowRight')) dx += 1;
+    // normalize diagonal
+    if (dx !== 0 && dy !== 0) {
+      const inv = 1 / Math.SQRT2;
+      dx *= inv; dy *= inv;
+    }
+    return { x: dx, y: dy };
+  }
+
+  get shooting() {
+    return this.mouse.down || this.isDown('Space');
+  }
+
+  endFrame() {
+    this.keysJustPressed.clear();
+    this.mouse.justDown = false;
+    this.scrollDelta = 0;
+  }
+};
+
+// ── 渲染器 ──
+G.Renderer = class Renderer {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+  }
+
+  resize() {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    this.width = this.canvas.width;
+    this.height = this.canvas.height;
+    this.centerX = this.width / 2;
+    this.centerY = this.height / 2;
+  }
+
+  clear() {
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.ctx.clearRect(0, 0, this.width, this.height);
+  }
+
+  applyShake(shake) {
+    this.ctx.setTransform(1, 0, 0, 1, shake.offsetX, shake.offsetY);
+  }
+
+  drawBackground(time) {
+    const ctx = this.ctx;
+    // 深空背景 + 微弱网格
+    ctx.fillStyle = '#080810';
+    ctx.fillRect(0, 0, this.width, this.height);
+
+    // 星空层（伪随机固定星点）
+    ctx.fillStyle = 'rgba(200,220,255,0.3)';
+    const seed = 12345;
+    for (let i = 0; i < 80; i++) {
+      const px = ((seed * (i + 1) * 7919) % this.width);
+      const py = ((seed * (i + 1) * 6271) % this.height);
+      const size = ((i * 3) % 3) * 0.5 + 0.5;
+      const flicker = 0.5 + 0.5 * Math.sin(time * 2 + i);
+      ctx.globalAlpha = flicker * 0.4;
+      ctx.fillRect(px, py, size, size);
+    }
+    ctx.globalAlpha = 1;
+
+    // 微弱网格
+    ctx.strokeStyle = 'rgba(40,60,100,0.08)';
+    ctx.lineWidth = 1;
+    const gridSize = 80;
+    for (let x = 0; x < this.width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, this.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y < this.height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(this.width, y);
+      ctx.stroke();
+    }
+  }
+};
+
+// ── 游戏状态 ──
+G.State = {
+  MENU: 'menu',
+  PLAYING: 'playing',
+  PAUSED: 'paused',
+  GAMEOVER: 'gameover',
+};
+
+// ── 全局游戏数据 ──
+G.gameData = {
+  score: 0,
+  wave: 1,
+  kills: 0,
+  state: G.State.MENU,
+  time: 0,
+  paused: false,
+};
+
+// ── 游戏循环 ──
+G.GameLoop = class GameLoop {
+  constructor() {
+    this.lastTime = 0;
+    this.accumulator = 0;
+    this.fixedDt = 1 / 60;
+    this.running = false;
+    this.updateFn = null;
+    this.renderFn = null;
+    this._frame = this._frame.bind(this);
+  }
+
+  start(updateFn, renderFn) {
+    this.updateFn = updateFn;
+    this.renderFn = renderFn;
+    this.running = true;
+    this.lastTime = performance.now() / 1000;
+    requestAnimationFrame(this._frame);
+  }
+
+  stop() { this.running = false; }
+
+  _frame(timestamp) {
+    if (!this.running) return;
+    const now = timestamp / 1000;
+    let dt = now - this.lastTime;
+    this.lastTime = now;
+
+    // 防止大跳帧
+    if (dt > 0.1) dt = 0.1;
+
+    this.accumulator += dt;
+
+    // 固定步长物理更新
+    while (this.accumulator >= this.fixedDt) {
+      this.updateFn(this.fixedDt);
+      this.accumulator -= this.fixedDt;
+    }
+
+    this.renderFn(now);
+    requestAnimationFrame(this._frame);
+  }
+};
+
+console.log('[Game] core.js loaded');
+
+
+// ===== entities.js =====
+// ═══════════════════════════════════════════════════════
+// entities.js — 玩家飞船 / 敌人 / 子弹 / 粒子
+// ═══════════════════════════════════════════════════════
+// (G = window.Game)
+// ═══════════════ 玩家飞船 ═══════════════
+G.Player = class Player {
+  constructor(x, y, shipConfig) {
+    this.x = x; this.y = y;
+    this.vx = 0; this.vy = 0;
+    this.angle = -Math.PI / 2;
+    this.speed = 320;
+    this.invincible = 0;
+    this.thrusterPhase = 0;
+    this.engineGlow = 0;
+    this.alive = true;
+    this.fireCooldown = 0;
+
+    // 飞船配置
+    const sc = shipConfig || {};
+    this.maxHp = sc.maxHp || 100;
+    this.hp = this.maxHp;
+    this.regen = sc.regen || 0;
+    this.reflect = sc.reflect || 0;
+    this.maxShield = sc.maxShield || 0;
+    this.shield = this.maxShield;
+    this.shieldRegenDelay = 3; // 受伤后3秒回盾
+    this.shieldRegenTimer = 0;
+    this.reactive = sc.reactive || 0; // 反应装甲：受击反击子弹数
+    this.visual = sc.visual || { scale: 1, hue: 210, hasShield: false, hasSpikes: false, hasAura: false, color: '#5a7aac' };
+    this.radius = 20 * this.visual.scale;
+  }
+
+  update(dt, input, events) {
+    const move = input.movement;
+    const spd = this.speed * (G.hasGene('fast') ? 1.5 : 1); // 迅捷基因：移速+50%
+    this.vx = G.lerp(this.vx, move.x * spd, 8 * dt);
+    this.vy = G.lerp(this.vy, move.y * spd, 8 * dt);
+    this.x += this.vx * dt; this.y += this.vy * dt;
+    this.x = G.clamp(this.x, this.radius, G.renderer.width - this.radius);
+    this.y = G.clamp(this.y, this.radius, G.renderer.height - this.radius);
+    this.angle = G.angle(this.x, this.y, input.mouse.x, input.mouse.y);
+    this.thrusterPhase += dt * 15;
+    const moving = Math.abs(move.x) + Math.abs(move.y) > 0;
+    this.engineGlow = G.lerp(this.engineGlow, moving ? 1 : 0.3, 4 * dt);
+    if (this.invincible > 0) this.invincible -= dt;
+    if (this.fireCooldown > 0) this.fireCooldown -= dt;
+
+    // 回血（再生基因额外+10/秒）
+    const regenTotal = this.regen + (G.hasGene('healer') ? 10 : 0);
+    if (regenTotal > 0 && this.hp < this.maxHp) {
+      this.hp = Math.min(this.maxHp, this.hp + regenTotal * dt);
+    }
+    // 回盾
+    if (this.maxShield > 0) {
+      this.shieldRegenTimer -= dt;
+      if (this.shieldRegenTimer <= 0 && this.shield < this.maxShield) {
+        this.shield = Math.min(this.maxShield, this.shield + this.maxShield * 0.1 * dt);
+      }
+    }
+  }
+
+  takeDamage(amount, events, srcX, srcY) {
+    if (this.invincible > 0) return 0;
+    if (G.hasGene('tank')) amount *= 0.5; // 坚韧基因：受到伤害减半
+    // 护盾优先吸收
+    if (this.shield > 0) {
+      const abs = Math.min(this.shield, amount);
+      this.shield -= abs; amount -= abs;
+    }
+    this.hp -= amount;
+    this.invincible = 0.5;
+    this.shieldRegenTimer = this.shieldRegenDelay;
+    const reflected = amount > 0 ? this.reflect + (G.hasGene('reflector') ? 15 : 0) : 0; // 反射基因：反伤+15
+    // 反应装甲：每次受到伤害，触发 点数 次反应，每次向伤害源发射一整轮武器齐射
+    if (amount > 0 && this.reactive > 0 && G.weaponSystem && G.weaponSystem.weapon) {
+      const ang = (typeof srcX === 'number') ? G.angle(this.x, this.y, srcX, srcY) : G.RAND() * G.TWO_PI;
+      G.weaponSystem.fireReactive(this, ang, this.reactive);
+    }
+    events.emit('player:hit', { damage: amount, hp: this.hp, reflected });
+    if (this.hp <= 0) { this.hp = 0; this.alive = false; events.emit('player:death', {}); }
+    return reflected;
+  }
+
+  draw(ctx, time) {
+    const vs = this.visual.scale;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle);
+    ctx.scale(vs, vs);
+
+    const flicker = this.invincible > 0 && Math.sin(time * 30) > 0;
+    if (flicker) ctx.globalAlpha = 0.4;
+
+    // ── 护盾光环 ──
+    if (this.maxShield > 0 && this.shield > 0) {
+      const sr = this.shield / this.maxShield;
+      ctx.strokeStyle = `rgba(80,180,255,${0.25 + sr * 0.35})`;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(0, 0, 24 + Math.sin(time*3)*2, 0, G.TWO_PI * sr); ctx.stroke();
+    }
+    // ── 回复光环 ──
+    if (this.visual.hasAura) {
+      ctx.strokeStyle = `rgba(80,255,120,${0.15 + 0.1*Math.sin(time*4)})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, 28 + Math.sin(time*2)*4, 0, G.TWO_PI); ctx.stroke();
+    }
+
+    // ── 引擎火焰（尾部双喷口） ──
+    const flameLen = 8 + Math.sin(this.thrusterPhase) * 4 * this.engineGlow;
+    for (const ey of [-7, 7]) {
+      const flameGrad = ctx.createLinearGradient(-14 - flameLen, ey, -11, ey);
+      flameGrad.addColorStop(0, 'rgba(0,150,255,0)');
+      flameGrad.addColorStop(0.5, 'rgba(80,180,255,0.7)');
+      flameGrad.addColorStop(1, 'rgba(200,230,255,0.9)');
+      ctx.fillStyle = flameGrad;
+      ctx.beginPath(); ctx.moveTo(-11, ey - 3); ctx.lineTo(-13 - flameLen, ey); ctx.lineTo(-11, ey + 3); ctx.closePath(); ctx.fill();
+    }
+
+    // ── 反伤尖刺（圆周均布） ──
+    if (this.visual.hasSpikes) {
+      ctx.fillStyle = `rgba(255,160,60,${0.5+0.3*Math.sin(time*5)})`;
+      for (let i = 0; i < 8; i++) {
+        const sa = i * G.TWO_PI / 8;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(sa)*20, Math.sin(sa)*20);
+        ctx.lineTo(Math.cos(sa-0.18)*13, Math.sin(sa-0.18)*13);
+        ctx.lineTo(Math.cos(sa+0.18)*13, Math.sin(sa+0.18)*13);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+
+    // ── 圆形主体 ──
+    ctx.shadowColor = this.visual.color; ctx.shadowBlur = 12;
+    const bodyGrad = ctx.createRadialGradient(3, -3, 2, 0, 0, 15);
+    bodyGrad.addColorStop(0, '#fff');
+    bodyGrad.addColorStop(0.4, this.visual.color);
+    bodyGrad.addColorStop(1, G.hslToHex(this.visual.hue, 40, 25));
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath(); ctx.arc(0, 0, 15, 0, G.TWO_PI); ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // ── 装甲外环+侧翼细节 ──
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, 0, 13, 0, G.TWO_PI); ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(0, 0, 9, 0.6, 2.55); ctx.stroke(); // 后部弧线接缝
+    ctx.beginPath(); ctx.arc(0, 0, 9, -2.55, -0.6); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; // 侧翼指示灯
+    ctx.beginPath(); ctx.arc(-4, -9, 1.6, 0, G.TWO_PI); ctx.fill();
+    ctx.beginPath(); ctx.arc(-4, 9, 1.6, 0, G.TWO_PI); ctx.fill();
+
+    // ── 前部炮管（指向准星） ──
+    ctx.fillStyle = G.hslToHex(this.visual.hue, 40, 30);
+    ctx.fillRect(9, -2.5, 10, 5);
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillRect(17, -1.5, 3, 3);
+
+    // ── 核心亮点（脉冲） ──
+    const pulse = 0.7 + 0.3 * Math.sin(time * 4);
+    ctx.fillStyle = `rgba(255,255,255,${0.75 * pulse})`;
+    ctx.beginPath(); ctx.arc(0, 0, 4, 0, G.TWO_PI); ctx.fill();
+    ctx.strokeStyle = `rgba(255,255,255,${0.3 * pulse})`; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, G.TWO_PI); ctx.stroke();
+
+    ctx.restore();
+  }
+};
+
+// ═══════════════ 无人机系统（无人机加点替代基础射击） ═══════════════
+G.Drone = class Drone {
+  constructor() {
+    this.x = 0; this.y = 0; this.vx = 0; this.vy = 0;
+    this.radius = 9; this.angle = 0;
+    this.alive = true; this.hp = 10; this.maxHp = 10;
+    this.respawnTimer = 0; this.fireCooldown = 0; this.invincible = 0; this.contactCd = 0;
+    this.phase = Math.random() * G.TWO_PI;
+  }
+
+  spawn(player) {
+    this.x = player.x + (G.RAND() - 0.5) * 40;
+    this.y = player.y + (G.RAND() - 0.5) * 40;
+    this.vx = 0; this.vy = 0;
+    this.maxHp = Math.max(5, Math.ceil(player.maxHp * 0.05)); // 血量=母船5%
+    this.hp = this.maxHp;
+    this.alive = true; this.respawnTimer = 0; this.invincible = 1;
+    G.particles.explosion(this.x, this.y, '#6cf', 20);
+  }
+
+  takeDamage(amount) {
+    if (!this.alive || this.invincible > 0) return;
+    this.hp -= amount; this.invincible = 0.8;
+    if (this.hp <= 0) {
+      this.alive = false; this.respawnTimer = 5; // 死亡后5秒由母船体内重生
+      G.particles.explosion(this.x, this.y, '#6cf', 24);
+    }
+  }
+
+  update(dt, player, input) {
+    if (!this.alive) {
+      this.respawnTimer -= dt;
+      if (this.respawnTimer <= 0 && player && player.alive) this.spawn(player);
+      return;
+    }
+    if (this.invincible > 0) this.invincible -= dt;
+    if (this.fireCooldown > 0) this.fireCooldown -= dt;
+    if (this.contactCd > 0) this.contactCd -= dt;
+    this.phase += dt * 10;
+    // 移动受左键控制：按住左键才朝准星方向移动（移动迅速）
+    const dx = input.mouse.x - this.x, dy = input.mouse.y - this.y;
+    const d = Math.hypot(dx, dy);
+    if (input.shooting && d > 24) {
+      this.vx = G.lerp(this.vx, (dx / d) * 700, 6 * dt);
+      this.vy = G.lerp(this.vy, (dy / d) * 700, 6 * dt);
+    } else { this.vx *= 0.9; this.vy *= 0.9; }
+    this.x += this.vx * dt; this.y += this.vy * dt;
+    this.x = G.clamp(this.x, this.radius, G.renderer.width - this.radius);
+    this.y = G.clamp(this.y, this.radius, G.renderer.height - this.radius);
+    // 飞行时按飞行方向自动调整机体角度
+    const spd = Math.hypot(this.vx, this.vy);
+    if (spd > 40) this.angle = Math.atan2(this.vy, this.vx);
+
+    // 自动射击离自己最近的敌人：发射母船子弹类型
+    const w = G.weaponSystem.weapon;
+    if (!w || this.fireCooldown > 0) return;
+    let target = null, nd = 480;
+    const act = G.enemyPool.active;
+    for (let i = 0; i < act.length; i++) {
+      const e = act[i];
+      if (!e.alive || e.charmed || e.phaseShift > 0) continue;
+      const dist = G.dist(this.x, this.y, e.x, e.y);
+      if (dist < nd) { nd = dist; target = e; }
+    }
+    if (target) {
+      const aim = G.angle(this.x, this.y, target.x, target.y);
+      if (spd <= 40) this.angle = aim; // 悬停时机头指向目标
+      G.weaponSystem.fireVolley(this.x + Math.cos(aim) * 10, this.y + Math.sin(aim) * 10, aim, null);
+      // 总射速与母船一致：单机间隔 = 机数 / 射速
+      const n = Math.max(1, w.droneCount || 1);
+      this.fireCooldown = n / w.fireRate / (G.hasGene('swarm') ? 1.3 : 1);
+    }
+  }
+
+  draw(ctx, time) {
+    if (!this.alive) return;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle);
+    if (this.invincible > 0 && Math.sin(time * 30) > 0) ctx.globalAlpha = 0.4;
+    // 引擎光
+    ctx.fillStyle = `rgba(100,200,255,${0.5 + 0.3 * Math.sin(this.phase)})`;
+    ctx.beginPath(); ctx.arc(-8, 0, 2.5, 0, G.TWO_PI); ctx.fill();
+    // 机体
+    ctx.shadowColor = '#6cf'; ctx.shadowBlur = 8;
+    ctx.fillStyle = '#9cf';
+    ctx.beginPath(); ctx.moveTo(9, 0); ctx.lineTo(-6, -6); ctx.lineTo(-3, 0); ctx.lineTo(-6, 6); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+    // 血条
+    if (this.hp < this.maxHp) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(this.x - 8, this.y - this.radius - 6, 16, 2);
+      ctx.fillStyle = '#6cf'; ctx.fillRect(this.x - 8, this.y - this.radius - 6, 16 * Math.max(0, this.hp / this.maxHp), 2);
+    }
+  }
+};
+
+// 无人机管理：数量与加点同步
+G.drones = [];
+G.syncDrones = function(count) {
+  while (G.drones.length > count) G.drones.pop();
+  while (G.drones.length < count) {
+    const dr = new G.Drone();
+    if (G.player && G.player.alive) dr.spawn(G.player); else { dr.alive = false; dr.respawnTimer = 1; }
+    G.drones.push(dr);
+  }
+};
+G.updateDrones = function(dt) {
+  for (let i = 0; i < G.drones.length; i++) G.drones[i].update(dt, G.player, G.input);
+};
+G.drawDrones = function(ctx, time) {
+  for (let i = 0; i < G.drones.length; i++) G.drones[i].draw(ctx, time);
+};
+
+// ═══════════════ 防御无人机系统（继承10%母船属性，卫星式护卫，不可攻击） ═══════════════
+G.GuardDrone = class GuardDrone {
+  constructor() {
+    this.x = 0; this.y = 0; this.radius = 8;
+    this.alive = false; this.respawnTimer = 0; this.invincible = 0; this.contactCd = 0;
+    this.maxHp = 5; this.hp = 5;
+    this.maxShield = 0; this.shield = 0; this.shieldRegenTimer = 0;
+    this.regen = 0; this.reflect = 0; this.reactive = 0;
+    this.phase = Math.random() * G.TWO_PI;
+  }
+
+  // 继承10%母船属性（血量/护盾/回复/反伤/反应装甲，不继承武器属性）
+  spawn(player) {
+    this.maxHp = Math.max(5, Math.ceil(player.maxHp * 0.1));
+    this.hp = this.maxHp;
+    this.maxShield = Math.round(player.maxShield * 0.1);
+    this.shield = this.maxShield;
+    this.regen = player.regen * 0.1;
+    this.reflect = Math.round(player.reflect * 0.1);
+    this.reactive = Math.round(player.reactive * 0.1);
+    this.x = player.x; this.y = player.y - 30;
+    this.alive = true; this.respawnTimer = 0; this.invincible = 1; this.contactCd = 0;
+    this.shieldRegenTimer = 0;
+    G.particles.explosion(this.x, this.y, '#4dd', 18);
+  }
+
+  takeDamage(amount, events, srcX, srcY) {
+    if (!this.alive || this.invincible > 0) return 0;
+    if (this.shield > 0) {
+      const abs = Math.min(this.shield, amount);
+      this.shield -= abs; amount -= abs;
+    }
+    this.shieldRegenTimer = 3;
+    this.hp -= amount; // 受击无免伤时间：避免无敌间隙造成母船防御漏洞
+    const reflected = amount > 0 ? this.reflect : 0;
+    // 反应装甲（继承自母船）：向伤害源触发武器齐射反击
+    if (amount > 0 && this.reactive > 0 && G.weaponSystem && G.weaponSystem.weapon) {
+      const ang = (typeof srcX === 'number') ? G.angle(this.x, this.y, srcX, srcY) : G.RAND() * G.TWO_PI;
+      G.weaponSystem.fireReactive(this, ang, this.reactive);
+    }
+    if (this.hp <= 0) {
+      this.hp = 0; this.alive = false; this.respawnTimer = 5; // 死亡后5秒重生
+      G.particles.explosion(this.x, this.y, '#4dd', 22);
+    }
+    return reflected;
+  }
+
+  update(dt, player, slot, aliveCount) {
+    if (!this.alive) {
+      this.respawnTimer -= dt;
+      if (this.respawnTimer <= 0 && player && player.alive) this.spawn(player);
+      return;
+    }
+    if (this.invincible > 0) this.invincible -= dt;
+    if (this.contactCd > 0) this.contactCd -= dt;
+    this.phase += dt * 6;
+    // 回血/回盾：每秒回复20%血量
+    if (this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.2 * dt);
+    if (this.maxShield > 0) {
+      this.shieldRegenTimer -= dt;
+      if (this.shieldRegenTimer <= 0 && this.shield < this.maxShield) {
+        this.shield = Math.min(this.maxShield, this.shield + this.maxShield * 0.1 * dt);
+      }
+    }
+    if (!player) return;
+    // 阵型：存活者按顺序补位，优先集中在母船前方（朝向准星）扇形展开，从正前方起左右交替排布
+    const k = Math.ceil(slot / 2);
+    const sign = slot % 2 === 0 ? -1 : 1;
+    const targetA = player.angle + sign * k * 0.42;
+    const targetR = 46 + Math.min(aliveCount, 8) * 2 + k * 5; // 角度越大半径越远，避免拥挤
+    const tx = player.x + Math.cos(targetA) * targetR;
+    const ty = player.y + Math.sin(targetA) * targetR;
+    this.x = G.lerp(this.x, tx, 10 * dt); // 高收敛速度：摧毁后其它机迅速补位
+    this.y = G.lerp(this.y, ty, 10 * dt);
+  }
+
+  draw(ctx, time) {
+    if (!this.alive) return;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    if (this.invincible > 0 && Math.sin(time * 30) > 0) ctx.globalAlpha = 0.4;
+    // 护盾环
+    if (this.maxShield > 0 && this.shield > 0) {
+      ctx.strokeStyle = `rgba(80,220,220,${0.25 + 0.35 * (this.shield / this.maxShield)})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, this.radius + 4, 0, G.TWO_PI); ctx.stroke();
+    }
+    // 圆形机体
+    const pulse = 0.8 + 0.2 * Math.sin(this.phase);
+    ctx.shadowColor = '#4dd'; ctx.shadowBlur = 8;
+    ctx.fillStyle = `rgba(80,220,220,${0.85 * pulse})`;
+    ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, G.TWO_PI); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(220,255,255,0.8)'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(0, 0, this.radius - 2, 0, G.TWO_PI); ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.arc(0, 0, 2, 0, G.TWO_PI); ctx.fill();
+    ctx.restore();
+    // 血条
+    if (this.hp < this.maxHp) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(this.x - 8, this.y - this.radius - 7, 16, 2);
+      ctx.fillStyle = '#4dd'; ctx.fillRect(this.x - 8, this.y - this.radius - 7, 16 * Math.max(0, this.hp / this.maxHp), 2);
+    }
+  }
+};
+
+// 防御无人机管理：数量与加点同步
+G.guards = [];
+G.syncGuards = function(count) {
+  while (G.guards.length > count) G.guards.pop();
+  while (G.guards.length < count) {
+    const gd = new G.GuardDrone();
+    if (G.player && G.player.alive) gd.spawn(G.player); else { gd.alive = false; gd.respawnTimer = 1; }
+    G.guards.push(gd);
+  }
+};
+G.updateGuards = function(dt) {
+  // 存活者依次占槽位：某架被摧毁后其余机立即前移补位，防止前方出现漏洞
+  let aliveCount = 0;
+  for (let i = 0; i < G.guards.length; i++) if (G.guards[i].alive) aliveCount++;
+  let slot = 0;
+  for (let i = 0; i < G.guards.length; i++) {
+    const g = G.guards[i];
+    g.update(dt, G.player, g.alive ? slot++ : -1, aliveCount);
+  }
+};
+G.drawGuards = function(ctx, time) {
+  for (let i = 0; i < G.guards.length; i++) G.guards[i].draw(ctx, time);
+};
+
+// ═══════════════ 进攻无人机系统（单击发射键出击：自动攻击直到弹药耗尽返航补给） ═══════════════
+G.StrikerDrone = class StrikerDrone {
+  constructor() {
+    this.x = 0; this.y = 0; this.vx = 0; this.vy = 0;
+    this.radius = 9; this.angle = 0;
+    this.alive = false; this.hp = 10; this.maxHp = 10; // 默认停泊母舰内，单击发射键出击
+    this.respawnTimer = 0; this.fireCooldown = 0; this.invincible = 0;
+    this.state = 'seek';        // seek(索敌) / charge(冲锋) / return(返航)
+    this.chargeTimer = 0; this.chargeAngle = 0;
+    this.roundsLeft = 2;        // 每次出击冲锋两轮，打完返航补给
+    this.evadeTimer = 0; this.evadeCd = 0; // 规避：持续1秒无敌，结束后冷却1秒
+    this.phase = Math.random() * G.TWO_PI;
+  }
+
+  spawn(player) {
+    this.x = player.x + (G.RAND() - 0.5) * 40;
+    this.y = player.y + (G.RAND() - 0.5) * 40;
+    this.vx = 0; this.vy = 0;
+    this.maxHp = Math.max(5, Math.ceil(player.maxHp * 0.05)); // 血量=母船5%（与普通无人机一致）
+    this.hp = this.maxHp;
+    this.alive = true; this.respawnTimer = 0; this.invincible = 1;
+    this.state = 'seek'; this.chargeTimer = 0; this.roundsLeft = 2;
+    this.evadeTimer = 0; this.evadeCd = 0;
+    G.particles.explosion(this.x, this.y, '#f84', 20);
+  }
+
+  takeDamage(amount) {
+    if (!this.alive || this.invincible > 0) return;
+    // 非冲锋时的主动规避：就绪时免伤闪避1秒
+    if (this.state !== 'charge' && this.evadeTimer <= 0 && this.evadeCd <= 0) {
+      this.evadeTimer = 1; this.invincible = 1;
+      G.particles.explosion(this.x, this.y, '#fc8', 14);
+      return;
+    }
+    this.hp -= amount; this.invincible = 0.8;
+    if (this.hp <= 0) {
+      this.alive = false; this.respawnTimer = 5; // 死亡后5秒由母船体内重生
+      G.particles.explosion(this.x, this.y, '#f84', 24);
+    }
+  }
+
+  update(dt, player, input) {
+    if (!this.alive) {
+      // 停泊/补给中：单击发射键（鼠标点击/空格）出击，无需按住
+      if (this.respawnTimer > 0) this.respawnTimer -= dt;
+      const firePressed = input.mouse.justDown || input.justPressed('Space');
+      if (this.respawnTimer <= 0 && player && player.alive && firePressed) this.spawn(player);
+      return;
+    }
+    if (this.invincible > 0) this.invincible -= dt;
+    if (this.fireCooldown > 0) this.fireCooldown -= dt;
+    if (this.evadeCd > 0) this.evadeCd -= dt;
+    this.phase += dt * 10;
+
+    // ── 冲锋状态：沿锁定方向高速突进+连射，全程自动规避（无敌） ──
+    if (this.state === 'charge') {
+      this.chargeTimer -= dt;
+      this.invincible = Math.max(this.invincible, 0.1); // 冲锋自动规避伤害
+      const spd = 360; // 移速减半
+      this.vx = Math.cos(this.chargeAngle) * spd;
+      this.vy = Math.sin(this.chargeAngle) * spd;
+      this.x += this.vx * dt; this.y += this.vy * dt;
+      this.angle = this.chargeAngle;
+      // 冲锋期间连射母船子弹（总射速与母船一致：单机间隔 = 机数 / 射速）
+      const w = G.weaponSystem && G.weaponSystem.weapon;
+      if (w && this.fireCooldown <= 0) {
+        G.weaponSystem.fireVolley(this.x + Math.cos(this.chargeAngle) * 10, this.y + Math.sin(this.chargeAngle) * 10, this.chargeAngle, null);
+        const n = Math.max(1, w.strikerCount || 1);
+        this.fireCooldown = n / w.fireRate / (G.hasGene('swarm') ? 1.3 : 1);
+      }
+      if (this.chargeTimer <= 0) {
+        this.roundsLeft--;
+        this.state = this.roundsLeft > 0 ? 'seek' : 'return'; // 两轮打完返航补给
+      }
+      this.x = G.clamp(this.x, this.radius, G.renderer.width - this.radius);
+      this.y = G.clamp(this.y, this.radius, G.renderer.height - this.radius);
+      return;
+    }
+
+    // ── 返航状态：弹药耗尽飞回母舰入坞补给，等待下次发射指令 ──
+    if (this.state === 'return') {
+      if (player && player.alive) {
+        const rd = G.dist(this.x, this.y, player.x, player.y);
+        if (rd < 24) {
+          this.alive = false;
+          this.respawnTimer = 3; // 入坞补给3秒，之后停泊等待下次单击出击
+          G.particles.explosion(this.x, this.y, '#fc8', 16);
+          return;
+        }
+        const a = G.angle(this.x, this.y, player.x, player.y);
+        this.vx = Math.cos(a) * 350; this.vy = Math.sin(a) * 350; // 移速减半
+        this.angle = a;
+      } else { this.vx *= 0.9; this.vy *= 0.9; }
+      this.x += this.vx * dt; this.y += this.vy * dt;
+      this.x = G.clamp(this.x, this.radius, G.renderer.width - this.radius);
+      this.y = G.clamp(this.y, this.radius, G.renderer.height - this.radius);
+      return;
+    }
+
+    // ── 规避状态（非冲锋受击触发）：1秒无敌闪避 ──
+    if (this.evadeTimer > 0) {
+      this.evadeTimer -= dt;
+      this.invincible = Math.max(this.invincible, 0.1);
+      if (this.evadeTimer <= 0) this.evadeCd = 1; // 规避结束进入1秒冷却（期间正常受伤）
+    }
+
+    // 移动：按住左键朝准星移动（与普通无人机一致，移速减半）
+    const dx = input.mouse.x - this.x, dy = input.mouse.y - this.y;
+    const d = Math.hypot(dx, dy);
+    if (input.shooting && d > 24) {
+      this.vx = G.lerp(this.vx, (dx / d) * 350, 6 * dt);
+      this.vy = G.lerp(this.vy, (dy / d) * 350, 6 * dt);
+    } else if (this.state === 'seek') {
+      // 索敌：飞向离母船最近的目标，进入射程发起冲锋
+      const t = this.findTarget(player);
+      if (t) {
+        const td = G.dist(this.x, this.y, t.x, t.y);
+        if (td < 340) {
+          this.state = 'charge'; this.chargeTimer = 1;
+          this.chargeAngle = G.angle(this.x, this.y, t.x, t.y);
+          this.fireCooldown = 0;
+          this.vx = 0; this.vy = 0;
+        } else {
+          const a = G.angle(this.x, this.y, t.x, t.y);
+          this.vx = G.lerp(this.vx, Math.cos(a) * 160, 4 * dt); // 移速减半
+          this.vy = G.lerp(this.vy, Math.sin(a) * 160, 4 * dt);
+          this.angle = a;
+        }
+      } else { this.vx *= 0.9; this.vy *= 0.9; }
+    } else { this.vx *= 0.9; this.vy *= 0.9; }
+    this.x += this.vx * dt; this.y += this.vy * dt;
+    this.x = G.clamp(this.x, this.radius, G.renderer.width - this.radius);
+    this.y = G.clamp(this.y, this.radius, G.renderer.height - this.radius);
+    const spd = Math.hypot(this.vx, this.vy);
+    if (spd > 40) this.angle = Math.atan2(this.vy, this.vx);
+  }
+
+  // 索敌：离母船最近的敌人
+  findTarget(player) {
+    if (!player) return null;
+    let target = null, nd = Infinity;
+    const act = G.enemyPool.active;
+    for (let i = 0; i < act.length; i++) {
+      const e = act[i];
+      if (!e.alive || e.charmed || e.phaseShift > 0) continue;
+      const dist = G.dist(player.x, player.y, e.x, e.y);
+      if (dist < nd) { nd = dist; target = e; }
+    }
+    return target;
+  }
+
+  draw(ctx, time) {
+    if (!this.alive) return;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.angle);
+    if (this.invincible > 0 && Math.sin(time * 30) > 0) ctx.globalAlpha = 0.4;
+    // 冲锋尾焰
+    if (this.state === 'charge') {
+      ctx.fillStyle = `rgba(255,140,60,${0.5 + 0.3 * Math.sin(this.phase)})`;
+      ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-16, -3); ctx.lineTo(-16, 3); ctx.closePath(); ctx.fill();
+    } else {
+      ctx.fillStyle = `rgba(255,170,90,${0.4 + 0.3 * Math.sin(this.phase)})`;
+      ctx.beginPath(); ctx.arc(-8, 0, 2.5, 0, G.TWO_PI); ctx.fill();
+    }
+    // 机体：前掠箭形
+    ctx.shadowColor = '#f84'; ctx.shadowBlur = 8;
+    ctx.fillStyle = '#fc9';
+    ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(-4, -7); ctx.lineTo(-7, 0); ctx.lineTo(-4, 7); ctx.closePath(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+    // 血条
+    if (this.hp < this.maxHp) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(this.x - 8, this.y - this.radius - 6, 16, 2);
+      ctx.fillStyle = '#f84'; ctx.fillRect(this.x - 8, this.y - this.radius - 6, 16 * Math.max(0, this.hp / this.maxHp), 2);
+    }
+  }
+};
+
+// 进攻无人机管理：数量与加点同步（默认停泊母舰内，按住发射键出击）
+G.strikers = [];
+G.syncStrikers = function(count) {
+  while (G.strikers.length > count) G.strikers.pop();
+  while (G.strikers.length < count) G.strikers.push(new G.StrikerDrone());
+};
+G.updateStrikers = function(dt) {
+  for (let i = 0; i < G.strikers.length; i++) G.strikers[i].update(dt, G.player, G.input);
+};
+G.drawStrikers = function(ctx, time) {
+  for (let i = 0; i < G.strikers.length; i++) G.strikers[i].draw(ctx, time);
+};
+
+// ═══════════════ 敌人系统 ═══════════════
+// ═══════════════ 基因掠夺系统（封印完成后触发） ═══════════════
+G.geneBuffs = {};   // trait → 剩余秒数
+G.genePhaseTimer = 0;
+G.geneNestTimer = 0; // 繁育基因：召唤友军 minion 计时
+
+// 基因可视化元数据（图标/配色沿用对应敌人）
+G.GeneMeta = {
+  normal:    { icon: 'gene', color: '#adf' },
+  tank:      { icon: 'hull', color: '#f44' },
+  fast:      { icon: 'fast', color: '#fa4' },
+  healer:    { icon: 'regen', color: '#4f4' },
+  splitter:  { icon: 'split', color: '#d4d' },
+  shielded:  { icon: 'shield', color: '#48f' },
+  explosive: { icon: 'burn', color: '#f80' },
+  teleporter:{ icon: 'teleporter', color: '#a4f' },
+  phaser:    { icon: 'phaser', color: '#8af' },
+  reflector: { icon: 'reflect', color: '#fc8' },
+  swarm:     { icon: 'swarm', color: '#f66' },
+  reviver:   { icon: 'reviver', color: '#2cc' },
+  bubble:    { icon: 'bubble', color: '#6ef' },
+  timelurker:{ icon: 'timelurker', color: '#b8f' },
+  nest:      { icon: 'nest', color: '#9a5' },
+};
+
+G.hasGene = trait => (G.geneBuffs[trait] || 0) > 0;
+
+G.gainGene = function(trait, duration, x, y) {
+  G.geneBuffs[trait] = duration; // 重复获取刷新持续时间
+  if (trait === 'phaser') G.genePhaseTimer = 0;
+  if (trait === 'nest') G.geneNestTimer = 2; // 繁育基因：首次召唤加速
+  if (trait === 'shielded' && G.player && G.player.alive) G.player.shield += 60; // 护盾基因：立即获得60护盾
+  G.events.emit('gene:gained', { trait, duration, x, y });
+};
+
+G.geneUpdate = function(dt) {
+  for (const t in G.geneBuffs) {
+    G.geneBuffs[t] -= dt;
+    if (G.geneBuffs[t] <= 0) delete G.geneBuffs[t];
+  }
+  // 相位基因：每3秒进入相位无敌1秒
+  if (G.hasGene('phaser') && G.player && G.player.alive) {
+    G.genePhaseTimer -= dt;
+    if (G.genePhaseTimer <= 0) {
+      G.player.invincible = Math.max(G.player.invincible, 1);
+      G.genePhaseTimer = 3;
+    }
+  }
+  // 繁育基因（育母之巢）：每8秒从玩家体内召唤一个魅惑 minion
+  if (G.hasGene('nest') && G.player && G.player.alive && G.enemyPool) {
+    G.geneNestTimer -= dt;
+    if (G.geneNestTimer <= 0) {
+      G.geneNestTimer = 8;
+      const m = G.enemyPool.get();
+      m.init(G.EnemyType.NORMAL,
+        G.player.x + (Math.random() - 0.5) * 80, G.player.y + (Math.random() - 0.5) * 80,
+        (G.gameData && G.gameData.wave) || 1);
+      m.convertToAlly(5);
+      G.particles.explosion(m.x, m.y, '#6f8', 20);
+    }
+  }
+};
+
+G.clearGenes = function() { G.geneBuffs = {}; G.genePhaseTimer = 0; G.geneNestTimer = 0; };
+
+G.EnemyType = {
+  NORMAL: 'normal', TANK: 'tank', FAST: 'fast', HEALER: 'healer',
+  SPLITTER: 'splitter', SHIELDED: 'shielded', EXPLOSIVE: 'explosive',
+  TELEPORTER: 'teleporter', BOSS: 'boss',
+  PHASER: 'phaser', REFLECTOR: 'reflector', SWARM: 'swarm',
+  REVIVER: 'reviver', BUBBLE: 'bubble', TIMELURKER: 'timelurker',
+  NEST: 'nest',
+};
+
+G.Enemy = class Enemy {
+  constructor() { this.reset(); }
+
+  reset() {
+    this.x = 0; this.y = 0; this.vx = 0; this.vy = 0;
+    this.radius = 20; this.hp = 10; this.maxHp = 10;
+    this.type = G.EnemyType.NORMAL; this.speed = 60; this.alive = false;
+    this.color = '#f44'; this.glowColor = 'rgba(255,60,60,0.4)';
+    this.phase = Math.random() * G.TWO_PI; this.frozen = 0;
+    this.freezeStack = 0; this.shockTimer = 0; // 冰冻叠加值(=减速%) / 感电减速计时
+    this.shield = 0; this.shieldMax = 0; this.healRate = 0;
+    this.splitCount = 0; this.teleportCooldown = 0;
+    this.scoreValue = 10; this.hitFlash = 0; this.traits = [];
+    this.spawnAnim = 1; this.facingAngle = 0;
+    // 新机制
+    this.phaseShift = 0; this.phaseShiftCooldown = 0;
+    this.dotDamage = 0; this.dotTimer = 0;
+    this.burnDps = 0; this.burnTimer = 0; this.burnAge = 0; // 燃烧（伤害随时间递增）
+    this.elementState = null; this.elementTimer = 0;
+    this.elite = null; // { type: 'speed'|'shield'|'aura', ... }
+    // 新敌人机制
+    this.revived = false; this.reviving = false; // 复活者
+    this.vulnMult = 1; this.baseRadius = 20; // 泡泡
+    this.timeAccum = 0; this.timeTick = 0; // 时间溜脱者
+    this.sealAccum = 0; this.charmAccum = 0; // 封印/魅惑累计
+    this.superAccum = 0; this.superTimer = 0; this.superGeneTime = 0; // 魅惑+封印叠加态
+    this.absorbed = false; // 封印吸收标记：跳过死亡触发的分裂/自爆
+    this.charmed = false; this.allyHitCd = 0; this.charmLife = 0; // 魅惑友军
+    this.spawnTimer = 0; // 育母之巢召唤计时
+  }
+
+  init(type, x, y, wave, elite) {
+    this.x = x; this.y = y; this.type = type;
+    this.phase = Math.random() * G.TWO_PI;
+    this.spawnAnim = 1; this.frozen = 0; this.hitFlash = 0;
+    this.freezeStack = 0; this.shockTimer = 0;
+    this.traits = []; this.alive = true;
+    this.phaseShift = 0; this.phaseShiftCooldown = 3 + Math.random()*2;
+    this.dotDamage = 0; this.dotTimer = 0;
+    this.burnDps = 0; this.burnTimer = 0; this.burnAge = 0;
+    this.elementState = null; this.elementTimer = 0;
+    this.elite = elite || null;
+    this.revived = false; this.reviving = false;
+    this.vulnMult = 1; this.timeAccum = 0; this.timeTick = 0;
+    this.sealAccum = 0; this.charmAccum = 0;
+    this.superAccum = 0; this.superTimer = 0; this.superGeneTime = 0;
+    this.absorbed = false;
+    this.charmed = false; this.allyHitCd = 0; this.charmLife = 0;
+    this.spawnTimer = 0;
+
+    const w = wave || 1;
+    const scale = 1 + (w - 1) * 0.15;
+
+    switch (type) {
+      case G.EnemyType.NORMAL:
+        this.radius = 18; this.maxHp = this.hp = Math.floor(30*scale);
+        this.speed = 50+w*3; this.color = '#e55'; this.glowColor = 'rgba(230,80,80,0.4)';
+        this.scoreValue = 10; break;
+      case G.EnemyType.TANK:
+        this.radius = 30; this.maxHp = this.hp = Math.floor(160*scale);
+        this.speed = 25+w; this.color = '#a44'; this.glowColor = 'rgba(180,60,60,0.5)';
+        this.scoreValue = 30; this.traits.push('tank'); break;
+      case G.EnemyType.FAST:
+        this.radius = 14; this.maxHp = this.hp = Math.floor(16*scale);
+        this.speed = 140+w*8; this.color = '#fa4'; this.glowColor = 'rgba(255,170,60,0.4)';
+        this.scoreValue = 15; this.traits.push('fast'); break;
+      case G.EnemyType.HEALER:
+        this.radius = 22; this.maxHp = this.hp = Math.floor(50*scale);
+        this.speed = 35; this.healRate = 10+w*1;
+        this.color = '#4d4'; this.glowColor = 'rgba(60,220,60,0.4)';
+        this.scoreValue = 25; this.traits.push('healer'); break;
+      case G.EnemyType.SPLITTER:
+        this.radius = 24; this.maxHp = this.hp = Math.floor(60*scale);
+        this.speed = 40+w*2; this.splitCount = 3;
+        this.color = '#d4d'; this.glowColor = 'rgba(220,60,220,0.4)';
+        this.scoreValue = 20; this.traits.push('splitter'); break;
+      case G.EnemyType.SHIELDED:
+        this.radius = 20; this.maxHp = this.hp = Math.floor(40*scale);
+        this.shieldMax = this.shield = Math.floor(60*scale); this.speed = 45;
+        this.color = '#48f'; this.glowColor = 'rgba(60,130,255,0.4)';
+        this.scoreValue = 25; this.traits.push('shielded'); break;
+      case G.EnemyType.EXPLOSIVE:
+        this.radius = 16; this.maxHp = this.hp = Math.floor(20*scale);
+        this.speed = 80+w*4; this.color = '#f80'; this.glowColor = 'rgba(255,140,0,0.5)';
+        this.scoreValue = 15; this.traits.push('explosive'); break;
+      case G.EnemyType.TELEPORTER:
+        this.radius = 16; this.maxHp = this.hp = Math.floor(24*scale);
+        this.speed = 60; this.teleportCooldown = 2;
+        this.color = '#a4f'; this.glowColor = 'rgba(170,70,255,0.4)';
+        this.scoreValue = 20; this.traits.push('teleporter'); break;
+      case G.EnemyType.PHASER:
+        this.radius = 18; this.maxHp = this.hp = Math.floor(44*scale);
+        this.speed = 55; this.color = '#8af'; this.glowColor = 'rgba(130,170,255,0.5)';
+        this.scoreValue = 25; this.traits.push('phaser'); break;
+      case G.EnemyType.REFLECTOR:
+        this.radius = 22; this.maxHp = this.hp = Math.floor(70*scale);
+        this.speed = 40; this.color = '#fc8'; this.glowColor = 'rgba(255,200,130,0.4)';
+        this.scoreValue = 30; this.traits.push('reflector'); break;
+      case G.EnemyType.SWARM:
+        this.radius = 10; this.maxHp = this.hp = Math.floor(6*scale);
+        this.speed = 100+w*5; this.color = '#f66'; this.glowColor = 'rgba(255,100,100,0.5)';
+        this.scoreValue = 5; this.traits.push('swarm'); break;
+      case G.EnemyType.REVIVER:
+        this.radius = 24; this.maxHp = this.hp = Math.floor(60*scale);
+        this.speed = 45; this.color = '#2cc'; this.glowColor = 'rgba(40,200,200,0.4)';
+        this.scoreValue = 35; this.traits.push('reviver'); break;
+      case G.EnemyType.BUBBLE:
+        this.radius = 16; this.maxHp = this.hp = Math.floor(40*scale);
+        this.baseRadius = 16; this.speed = 55+w*3;
+        this.color = '#6ef'; this.glowColor = 'rgba(100,240,255,0.4)';
+        this.scoreValue = 20; this.traits.push('bubble'); break;
+      case G.EnemyType.TIMELURKER:
+        this.radius = 22; this.maxHp = this.hp = Math.floor(50*scale);
+        this.speed = 40; this.color = '#b8f'; this.glowColor = 'rgba(180,130,255,0.5)';
+        this.scoreValue = 30; this.traits.push('timelurker'); break;
+      case G.EnemyType.NEST:
+        this.radius = 42; this.maxHp = this.hp = Math.floor(500*scale);
+        this.speed = 0; this.spawnTimer = 3; // 育母之巢：无法移动，首次召唤3秒后
+        this.color = '#9a5'; this.glowColor = 'rgba(150,200,80,0.5)';
+        this.scoreValue = 120; this.traits.push('nest'); break;
+      case G.EnemyType.BOSS:
+        this.radius = 50; this.maxHp = this.hp = Math.floor(1000*scale);
+        this.speed = 20; this.color = '#f22'; this.glowColor = 'rgba(255,30,30,0.6)';
+        this.scoreValue = 200; this.healRate = 4;
+        this.traits.push('boss','tank'); break;
+    }
+
+    // 精英词缀增强
+    if (this.elite) {
+      switch (this.elite.type) {
+        case 'speed': this.speed *= 1.8; this.color = '#ff4'; this.scoreValue *= 2; break;
+        case 'shield': this.shieldMax = this.shield = this.maxHp * 0.5; this.scoreValue *= 2; break;
+        case 'aura': this.color = '#f8f'; this.scoreValue *= 2; break;
+      }
+    }
+  }
+
+  applyDOT(dps, duration) {
+    this.dotDamage = Math.max(this.dotDamage, dps);
+    this.dotTimer = Math.max(this.dotTimer, duration);
+  }
+
+  // 燃烧：伤害随燃烧时长增长（每秒+100%，最高6倍）；重复命中只刷新时长，伤害不叠加
+  applyBurn(dps, duration) {
+    if (!this.alive) return;
+    if (this.burnTimer <= 0) { this.burnAge = 0; this.burnDps = dps; }
+    else this.burnDps = Math.max(this.burnDps, dps);
+    this.burnTimer = Math.max(this.burnTimer, duration);
+  }
+
+  applyElement(effect) {
+    this.elementState = effect; this.elementTimer = 3;
+    if (effect === 'burn') this.applyBurn(8, 3);
+  }
+
+  // 冰冻叠加：叠加值=减速百分比，每秒自动-10%，满100%冰冻2秒并清零
+  applyFreeze(amount) {
+    if (!this.alive || this.frozen > 0) return;
+    this.freezeStack = Math.min(100, this.freezeStack + amount);
+    this.elementState = 'freeze'; this.elementTimer = 3;
+    if (this.freezeStack >= 100) {
+      this.freezeStack = 0;
+      this.frozen = 2;
+      G.particles.freezeBurst(this.x, this.y);
+    }
+  }
+
+  // 感电：3秒减速50%（重复施加仅刷新时长，不叠加）
+  applyShock() {
+    if (!this.alive) return;
+    this.shockTimer = 3;
+    this.elementState = 'shock'; this.elementTimer = 3;
+  }
+
+  update(dt, playerX, playerY, events, enemies) {
+    this.spawnAnim = Math.max(0, this.spawnAnim - dt * 3);
+    this.hitFlash = Math.max(0, this.hitFlash - dt * 8);
+    this.phase += dt * 3;
+
+    // 魅惑友军：仅切换攻击冷却计数，其余机制/技能照常运行（下方统一处理追击目标）
+    if (this.charmed) this.allyHitCd = Math.max(0, this.allyHitCd - dt);
+
+    // 叠加态临时魅惑倒计时：到期后封印吸收并夺取基因
+    if (this.superTimer > 0) {
+      this.superTimer -= dt;
+      if (this.superTimer <= 0 && this.alive) {
+        const trait = this.traits[0] || 'normal';
+        this.charmed = false;
+        this.absorb(events); // 封印吸收：静默击杀
+        G.particles.explosion(this.x, this.y, '#a6f', this.radius * 1.5);
+        G.gainGene(trait, this.superGeneTime, this.x, this.y);
+        return;
+      }
+    }
+
+    // 育母之巢：每5秒不停召唤敌人（被魅惑后召唤友军后代）
+    if (this.traits.includes('nest')) {
+      this.spawnTimer -= dt;
+      if (this.spawnTimer <= 0) {
+        this.spawnTimer = 5;
+        events.emit('nest:spawn', { enemy: this });
+      }
+    }
+
+    // 复活者：复活中无法行动，快速回血，回满恢复行动
+    if (this.reviving) {
+      this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.25 * dt);
+      if (this.hp >= this.maxHp) {
+        this.reviving = false;
+        this.speed *= 1.3; // 复活后狂暴加速
+        events.emit('enemy:revive', { enemy: this });
+      }
+      return;
+    }
+
+    // 时间溜脱者：累计伤害池按每秒10%释放
+    if (this.traits.includes('timelurker') && this.timeAccum > 0) {
+      this.timeTick += dt;
+      if (this.timeTick >= 1) {
+        this.timeTick = 0;
+        const drain = this.timeAccum * 0.1;
+        this.timeAccum -= drain;
+        this.hp -= drain;
+        this.hitFlash = 1;
+        if (this.hp <= 0) { this.alive = false; events.emit('enemy:death', { enemy: this }); return; }
+      }
+    }
+
+    // 元素状态衰减
+    if (this.elementTimer > 0) this.elementTimer -= dt;
+    if (this.shockTimer > 0) this.shockTimer -= dt;
+    if (this.freezeStack > 0 && this.frozen <= 0) this.freezeStack = Math.max(0, this.freezeStack - 10 * dt); // 冰冻值每秒-10%
+
+    if (this.frozen > 0) { this.frozen -= dt; return; }
+
+    // 相位移动（PHASER型 & BOSS定期）
+    if (this.traits.includes('phaser') || this.traits.includes('boss')) {
+      this.phaseShiftCooldown -= dt;
+      if (this.phaseShiftCooldown <= 0 && this.phaseShift <= 0) {
+        this.phaseShift = 2.5; // 持续2.5秒
+        this.phaseShiftCooldown = 6 + Math.random()*4;
+      }
+    }
+    if (this.phaseShift > 0) { this.phaseShift -= dt; }
+
+    // 自愈
+    if (this.healRate > 0 && this.hp < this.maxHp) this.hp = Math.min(this.maxHp, this.hp + this.healRate * dt);
+
+    // 精英光环：给附近敌人加速
+    if (this.elite && this.elite.type === 'aura') {
+      // aura effect handled in wave manager or main loop
+    }
+
+    // 传送者
+    if (this.traits.includes('teleporter')) {
+      this.teleportCooldown -= dt;
+      if (this.teleportCooldown <= 0) {
+        this.teleportCooldown = G.randFloat(2, 4);
+        const a = G.randFloat(0, G.TWO_PI), d = G.randFloat(80, 200);
+        this.x = G.clamp(this.x+Math.cos(a)*d, this.radius, G.renderer.width-this.radius);
+        this.y = G.clamp(this.y+Math.sin(a)*d, this.radius, G.renderer.height-this.radius);
+        events.emit('enemy:teleport', { enemy: this });
+      }
+    }
+
+    // 追击目标：魅惑追最近敌人，否则追玩家
+    let tx = playerX, ty = playerY, hasTarget = true;
+    if (this.charmed) {
+      let target = null, nd = Infinity;
+      if (enemies) for (let i = 0; i < enemies.length; i++) {
+        const o = enemies[i];
+        if (!o.alive || o.charmed || o === this || o.reviving) continue;
+        const d = G.dist(this.x, this.y, o.x, o.y);
+        if (d < nd) { nd = d; target = o; }
+      }
+      if (!target) hasTarget = false;
+      else { tx = target.x; ty = target.y; }
+    }
+
+    const dx = tx - this.x, dy = ty - this.y;
+    const dist = Math.hypot(dx, dy);
+
+    // 朝向
+    if (hasTarget) this.facingAngle = Math.atan2(dy, dx);
+
+    // 相位中速度减半；时滞基因：玩家附近160px内非友军敌人再减速50%；感电-50%；冰冻叠加值=减速%
+    let spdMul = this.phaseShift > 0 ? 0.5 : 1;
+    if (this.shockTimer > 0) spdMul *= 0.5;
+    if (this.freezeStack > 0) spdMul *= 1 - this.freezeStack / 100;
+    if (!this.charmed && G.hasGene('timelurker') && G.player &&
+        G.dist(this.x, this.y, G.player.x, G.player.y) < 160) spdMul *= 0.5;
+
+    if (!hasTarget) {
+      this.vx = 0; this.vy = 0;
+    } else if (this.traits.includes('fast')) {
+      const zigzag = Math.sin(this.phase*3)*60;
+      const ang = Math.atan2(dy, dx), perpAng = ang + Math.PI/2;
+      this.vx = Math.cos(ang)*this.speed*spdMul + Math.cos(perpAng)*zigzag;
+      this.vy = Math.sin(ang)*this.speed*spdMul + Math.sin(perpAng)*zigzag;
+    } else if (this.traits.includes('boss')) {
+      const orbitAng = Math.atan2(dy, dx) + Math.sin(this.phase*0.5)*0.8;
+      this.vx = Math.cos(orbitAng)*this.speed*spdMul;
+      this.vy = Math.sin(orbitAng)*this.speed*spdMul;
+    } else if (this.traits.includes('swarm')) {
+      // 蜂群：直线冲撞
+      if (dist > 0) {
+        this.vx = (dx/dist)*this.speed*spdMul*1.2;
+        this.vy = (dy/dist)*this.speed*spdMul*1.2;
+      }
+    } else {
+      if (dist > 0) {
+        this.vx = G.lerp(this.vx, (dx/dist)*this.speed*spdMul, 2*dt);
+        this.vy = G.lerp(this.vy, (dy/dist)*this.speed*spdMul, 2*dt);
+      }
+    }
+
+    this.x += this.vx * dt; this.y += this.vy * dt;
+    this.x = G.clamp(this.x, this.radius, G.renderer.width - this.radius);
+    this.y = G.clamp(this.y, this.radius, G.renderer.height - this.radius);
+  }
+
+  takeDamage(amount, events, fromEnemy = false) {
+    // 魅惑友军：仅免疫玩家伤害；敌方攻击按正常特质处理（护盾/泡泡/时间溜脱/复活等机制照常生效）
+    if (this.charmed && !fromEnemy) return false;
+    // 泡泡：每次受击变大10%、受到伤害增加10%
+    if (this.traits.includes('bubble')) {
+      amount *= this.vulnMult;
+      this.bubbleGrow();
+    }
+    if (this.shield > 0) {
+      const absorbed = Math.min(this.shield, amount);
+      this.shield -= absorbed; amount -= absorbed;
+      if (absorbed > 0) events.emit('enemy:shieldHit', { enemy: this, absorbed });
+    }
+    if (amount <= 0) return false;
+    // 时间溜脱者：伤害进入累计池，按每秒10%释放
+    if (this.traits.includes('timelurker')) {
+      this.timeAccum += amount;
+      this.hitFlash = 1;
+      events.emit('enemy:hit', { enemy: this, damage: amount });
+      return false;
+    }
+    this.hp -= amount; this.hitFlash = 1;
+    events.emit('enemy:hit', { enemy: this, damage: amount });
+    if (this.hp <= 0) {
+      // 复活者：第一次死亡后最大生命值翻倍，进入复活状态
+      if (this.traits.includes('reviver') && !this.revived) {
+        this.revived = true; this.reviving = true;
+        this.maxHp *= 2;
+        this.hp = Math.max(1, this.maxHp * 0.15);
+        events.emit('enemy:downed', { enemy: this });
+        return false;
+      }
+      this.alive = false; events.emit('enemy:death', { enemy: this }); return true;
+    }
+    return false;
+  }
+
+  // 泡泡变大：受击体积+10%、受伤+10%、分数+5%（普通/魅惑/封印命中均触发）
+  bubbleGrow() {
+    if (!this.traits.includes('bubble')) return;
+    this.vulnMult = Math.min(3, this.vulnMult * 1.1);
+    if (this.radius < this.baseRadius * 3) {
+      this.radius = Math.min(this.baseRadius * 3, this.radius * 1.1);
+      this.scoreValue = Math.floor(this.scoreValue * 1.05);
+    }
+  }
+
+  // 魅惑转化：成为玩家友军（永久存在，Boss也可被魅惑；数据保持原样）
+  // regen：魅惑加点提供的每秒回血（每点+1），叠加在原healRate上
+  convertToAlly(regen = 0) {
+    this.charmed = true;
+    this.color = '#6f8'; this.glowColor = 'rgba(100,255,140,0.5)';
+    this.sealAccum = 0; this.charmAccum = 0; this.superAccum = 0;
+    if (regen > 0) this.healRate += regen;
+  }
+
+  // 封印吸收：强制静默击杀（绕过时间溜脱伤害池/复活者重生/死亡自爆与分裂），用于封印满值与叠加态到期
+  absorb(events) {
+    if (!this.alive) return;
+    this.absorbed = true;
+    this.hp = 0; this.alive = false;
+    events.emit('enemy:death', { enemy: this });
+  }
+
+  draw(ctx, time) {
+    const scale = 1 - this.spawnAnim * 0.5;
+    const alpha = 1 - this.spawnAnim;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.scale(scale, scale);
+    ctx.globalAlpha = alpha;
+
+    // 相位效果：半透明+闪烁
+    if (this.phaseShift > 0) {
+      ctx.globalAlpha = 0.25 + 0.15 * Math.sin(time * 12);
+    }
+
+    // 精英光环
+    if (this.elite) {
+      const eColor = this.elite.type==='speed'?'#ff4':this.elite.type==='shield'?'#4af':'#f4f';
+      ctx.strokeStyle = eColor; ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.4 + 0.2*Math.sin(time*5);
+      ctx.beginPath(); ctx.arc(0,0,this.radius+10,0,G.TWO_PI); ctx.stroke();
+      ctx.globalAlpha = alpha;
+    }
+
+    // 主体球
+    const grad = ctx.createRadialGradient(-this.radius*0.2,-this.radius*0.2,this.radius*0.1,0,0,this.radius);
+    const baseColor = this.hitFlash > 0.5 ? '#fff' : this.color;
+    grad.addColorStop(0, baseColor); grad.addColorStop(0.7, this.color); grad.addColorStop(1, 'rgba(0,0,0,0.3)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(0,0,this.radius,0,G.TWO_PI); ctx.fill();
+
+    // 育母之巢：外层脉动卵囊
+    if (this.traits.includes('nest')) {
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * G.TWO_PI + time * 0.4;
+        const er = this.radius * 0.3 + Math.sin(time * 2 + i) * 3;
+        ctx.fillStyle = `rgba(190,240,120,${0.35 + 0.2 * Math.sin(time * 3 + i)})`;
+        ctx.beginPath();
+        ctx.arc(Math.cos(a) * this.radius * 0.65, Math.sin(a) * this.radius * 0.65, er, 0, G.TWO_PI);
+        ctx.fill();
+      }
+      // 召唤进度环
+      const sp = 1 - Math.max(0, this.spawnTimer) / 5;
+      ctx.strokeStyle = 'rgba(190,240,120,0.6)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, this.radius + 6, -Math.PI/2, -Math.PI/2 + G.TWO_PI * sp); ctx.stroke();
+    }
+
+    // 反射者：正面盾牌指示
+    if (this.traits.includes('reflector')) {
+      ctx.save(); ctx.rotate(this.facingAngle);
+      ctx.strokeStyle = 'rgba(255,220,100,0.7)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0,0,this.radius+3,-0.7,0.7); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,220,100,0.2)';
+      ctx.beginPath(); ctx.moveTo(0,0);
+      ctx.arc(0,0,this.radius+3,-0.7,0.7); ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+
+    // 护盾环
+    if (this.shield > 0) {
+      const sr = this.shield/this.shieldMax;
+      ctx.strokeStyle = `rgba(80,160,255,${0.4+sr*0.4})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0,0,this.radius+5,0,G.TWO_PI*sr); ctx.stroke();
+    }
+    // 自愈光环
+    if (this.healRate > 0) {
+      ctx.strokeStyle = `rgba(80,255,80,${0.2+0.1*Math.sin(time*4)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0,0,this.radius+3+Math.sin(time*2)*3,0,G.TWO_PI); ctx.stroke();
+    }
+
+    // 慢性毒药（绿环）
+    if (this.dotTimer > 0) {
+      ctx.strokeStyle = `rgba(130,230,70,${0.45+0.25*Math.sin(time*6)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0,0,this.radius+1,0,G.TWO_PI); ctx.stroke();
+    }
+    // 燃烧（橙环随燃烧时长变亮）
+    if (this.burnTimer > 0) {
+      const bm = Math.min(6, 1 + this.burnAge) / 6;
+      ctx.strokeStyle = `rgba(255,110,20,${0.3 + 0.5 * bm})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0,0,this.radius+1.5,0,G.TWO_PI); ctx.stroke();
+    }
+    // 元素标记
+    if (this.elementState) {
+      const ec = this.elementState==='burn'?'#f80':this.elementState==='freeze'?'#8df':'#ff0';
+      ctx.strokeStyle = ec; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(0,0,this.radius+6,0,G.TWO_PI*(this.elementTimer/3)); ctx.stroke();
+    }
+    // 冰冻叠加进度环（叠加值=减速%）
+    if (this.freezeStack > 0) {
+      ctx.strokeStyle = '#8df'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(0,0,this.radius+3,-Math.PI/2,-Math.PI/2 + G.TWO_PI*(this.freezeStack/100)); ctx.stroke();
+    }
+    // 感电电弧抖动
+    if (this.shockTimer > 0) {
+      ctx.strokeStyle = 'rgba(255,255,80,0.8)'; ctx.lineWidth = 1;
+      for (let i = 0; i < 2; i++) {
+        const a1 = Math.random()*G.TWO_PI;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a1)*this.radius, Math.sin(a1)*this.radius);
+        ctx.lineTo(Math.cos(a1)*(this.radius+4)+(Math.random()-0.5)*6, Math.sin(a1)*(this.radius+4)+(Math.random()-0.5)*6);
+        ctx.stroke();
+      }
+    }
+    // 封印累计：紫色进度环+百分比
+    if (this.sealAccum > 0) {
+      const p = Math.min(1, this.sealAccum / this.maxHp);
+      ctx.strokeStyle = '#a6f'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, this.radius + 9, -Math.PI/2, -Math.PI/2 + G.TWO_PI * p); ctx.stroke();
+      ctx.fillStyle = '#a6f'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(Math.floor(p * 100) + '%', 0, -this.radius - 14);
+    }
+    // 魅惑累计：粉色进度环
+    if (this.charmAccum > 0 && !this.charmed) {
+      const p = Math.min(1, this.charmAccum / this.maxHp);
+      ctx.strokeStyle = '#f6c'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, this.radius + 9, -Math.PI/2, -Math.PI/2 + G.TWO_PI * p); ctx.stroke();
+    }
+    // 叠加态累计：粉紫双色进度环
+    if (this.superAccum > 0 && !this.charmed) {
+      const p = Math.min(1, this.superAccum / this.maxHp);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = '#f6c';
+      ctx.beginPath(); ctx.arc(0, 0, this.radius + 13, -Math.PI/2, -Math.PI/2 + G.TWO_PI * p); ctx.stroke();
+      ctx.strokeStyle = '#a6f';
+      ctx.beginPath(); ctx.arc(0, 0, this.radius + 9, -Math.PI/2, -Math.PI/2 + G.TWO_PI * p); ctx.stroke();
+    }
+    // 叠加态临时魅惑倒计时
+    if (this.charmed && this.superTimer > 0) {
+      ctx.strokeStyle = '#a6f'; ctx.lineWidth = 2.5; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.arc(0, 0, this.radius + 9, 0, G.TWO_PI); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#d8aff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(Math.ceil(this.superTimer) + 's', 0, -this.radius - 14);
+    }
+    // 复活中：绿色脉动环
+    if (this.reviving) {
+      ctx.strokeStyle = `rgba(80,255,200,${0.5 + 0.3 * Math.sin(time * 10)})`; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(0, 0, this.radius + 6 + Math.sin(time * 6) * 3, 0, G.TWO_PI); ctx.stroke();
+    }
+    // 时间溜脱者：累计伤害池显示
+    if (this.traits.includes('timelurker') && this.timeAccum > 0) {
+      ctx.strokeStyle = 'rgba(180,130,255,0.8)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, this.radius + 7, 0, G.TWO_PI); ctx.stroke();
+      ctx.fillStyle = '#b8f'; ctx.font = 'bold 9px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText('⏳' + Math.ceil(this.timeAccum), 0, this.radius + 16);
+    }
+    // 魅惑友军标识
+    if (this.charmed) {
+      ctx.strokeStyle = `rgba(100,255,140,${0.5 + 0.3 * Math.sin(time * 5)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, this.radius + 5, 0, G.TWO_PI); ctx.stroke();
+    }
+
+    // 血量数字
+    const hpText = Math.ceil(this.hp).toString();
+    ctx.font = `bold ${Math.max(12,this.radius*0.7)}px 'Segoe UI',sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#fff'; ctx.shadowColor = 'rgba(0,0,0,0.8)'; ctx.shadowBlur = 4;
+    ctx.fillText(hpText, 0, 0); ctx.shadowBlur = 0;
+
+    // 血条
+    if (this.hp < this.maxHp) {
+      const barW = this.radius*2, barH = 3, barY = -this.radius-8;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(-barW/2,barY,barW,barH);
+      ctx.fillStyle = this.hp/this.maxHp > 0.3 ? '#4f4' : '#f44';
+      ctx.fillRect(-barW/2,barY,barW*(this.hp/this.maxHp),barH);
+    }
+
+    // Boss尖刺
+    if (this.traits.includes('boss')) {
+      ctx.strokeStyle = `rgba(255,50,50,${0.4+0.3*Math.sin(time*2)})`; ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i/8)*G.TWO_PI+time, r1=this.radius+4, r2=this.radius+12;
+        ctx.lineTo(Math.cos(a)*r2, Math.sin(a)*r2);
+        const a2=((i+0.5)/8)*G.TWO_PI+time;
+        ctx.lineTo(Math.cos(a2)*r1, Math.sin(a2)*r1);
+      }
+      ctx.closePath(); ctx.stroke();
+    }
+
+    if (this.frozen > 0) {
+      ctx.fillStyle = 'rgba(150,220,255,0.2)';
+      ctx.beginPath(); ctx.arc(0,0,this.radius+2,0,G.TWO_PI); ctx.fill();
+    }
+    ctx.restore();
+  }
+};
+
+// ═══════════════ 子弹系统 ═══════════════
+G.Bullet = class Bullet {
+  constructor() { this.reset(); }
+
+  reset() {
+    this.x = 0; this.y = 0; this.vx = 0; this.vy = 0;
+    this.angle = 0; this.speed = 600; this.damage = 10; this.radius = 3;
+    this.penetration = 0; this.pierceCount = 0; this.homing = 0;
+    this.aoe = 0; this.split = 0; this.alive = false;
+    this.life = 0; this.maxLife = 3;
+    this.color = '#4af'; this.trailColor = 'rgba(68,170,255,0.3)';
+    this.bulletShape = { primary: 'orb', secondary: 'orb', blend: 0, intensity: 0.5 };
+    this.trail = []; this.hitEnemies = new Set();
+    // 弹射
+    this.bounce = false; this.bounceCount = 0; this.bounceMax = 0;
+    // 新属性
+    this.dot = 0; this.zoneRadius = 0; this.zoneDps = 0;
+    this.burnDps = 0; this.freezePower = 0; this.shockPoints = 0;
+    this.zoneTick = 0; // AOE伤害计时器
+    // 特殊效果
+    this.lifesteal = 0; this.knockback = 0; this.sealRatio = 0; this.charmRatio = 0;
+    this.superAccumRatio = 0; this.superCharmTime = 0; this.superGeneTime = 0; // 叠加态
+    this.pierceAll = false; this.isChild = false; this.owner = 'player';
+  }
+
+  init(config) {
+    Object.assign(this, config);
+    this.alive = true; this.life = 0; this.pierceCount = 0;
+    this.trail = []; this.hitEnemies = new Set();
+    this.bounceCount = 0; this.zoneTick = 0;
+    this.angle = Math.atan2(this.vy, this.vx);
+  }
+
+  update(dt, enemies, events) {
+    this.life += dt;
+    if (this.life > this.maxLife) { this.alive = false; return; }
+
+    // 跟踪：每帧动态选取正前方最近的敌人，不锁死单一目标（身后的敌人不会把子弹拽回头）
+    if (this.homing > 0 && !this.isChild) {
+      const hx = Math.cos(this.angle), hy = Math.sin(this.angle);
+      let nearest = null, nearDist2 = 160000; // 400^2
+      for (let i = 0; i < enemies.length; i++) {
+        const e = enemies[i];
+        if (!e.alive || e.charmed || this.hitEnemies.has(e) || e.phaseShift > 0) continue;
+        const dx = e.x - this.x, dy = e.y - this.y;
+        const d2 = dx*dx + dy*dy;
+        if (d2 >= nearDist2) continue;
+        // 只跟踪正前方半球内的目标（与飞行方向夹角<90°）
+        const invD = 1 / (Math.sqrt(d2) || 1);
+        if ((dx * hx + dy * hy) * invD <= 0) continue;
+        nearDist2 = d2; nearest = e;
+      }
+      if (nearest) {
+        const targetAngle = Math.atan2(nearest.y - this.y, nearest.x - this.x);
+        const diff = G.angleDiff(this.angle, targetAngle);
+        this.angle += diff * this.homing * dt * 5;
+        this.vx = Math.cos(this.angle) * this.speed;
+        this.vy = Math.sin(this.angle) * this.speed;
+      }
+    }
+
+    this.x += this.vx * dt; this.y += this.vy * dt;
+
+    // 边界反弹
+    if (this.bounce) {
+      if (this.x < 0 || this.x > G.renderer.width) {
+        this.vx *= -1; this.angle = Math.atan2(this.vy, this.vx); this.bounceCount++;
+        this.x = G.clamp(this.x, 0, G.renderer.width);
+      }
+      if (this.y < 0 || this.y > G.renderer.height) {
+        this.vy *= -1; this.angle = Math.atan2(this.vy, this.vx); this.bounceCount++;
+        this.y = G.clamp(this.y, 0, G.renderer.height);
+      }
+      if (this.bounceCount > (this.bounceMax || 5)) this.alive = false;
+    } else {
+      const margin = 50;
+      if (this.x < -margin || this.x > G.renderer.width+margin ||
+          this.y < -margin || this.y > G.renderer.height+margin) this.alive = false;
+    }
+
+    // 拖尾
+    this.trail.push({ x: this.x, y: this.y, life: 0.1 });
+    if (this.trail.length > 5) this.trail.shift();
+    for (let i = this.trail.length - 1; i >= 0; i--) {
+      this.trail[i].life -= dt;
+      if (this.trail[i].life <= 0) this.trail.splice(i, 1);
+    }
+  }
+
+  draw(ctx, time) {
+    // 拖尾
+    for (let i = 0; i < this.trail.length; i++) {
+      const t = this.trail[i];
+      const alpha = (t.life / 0.1) * 0.25;
+      const r = this.radius * (t.life / 0.1) * 0.6;
+      ctx.globalAlpha = alpha; ctx.fillStyle = this.trailColor;
+      ctx.beginPath(); ctx.arc(t.x, t.y, r, 0, G.TWO_PI); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    G.drawBulletShape(ctx, this.x, this.y, this.angle, this.radius, this.bulletShape, this.color, time);
+  }
+};
+
+// ═══════════════ 伤害区域 ═══════════════
+G.DamageZone = class DamageZone {
+  constructor(x, y, radius, dps, duration, color) {
+    this.x = x; this.y = y; this.radius = radius; this.dps = dps;
+    this.duration = duration; this.life = 0; this.alive = true;
+    this.color = color || '#f84'; this.tickTimer = 0;
+  }
+  update(dt) {
+    this.life += dt;
+    if (this.life >= this.duration) this.alive = false;
+  }
+  draw(ctx, time) {
+    const progress = this.life / this.duration;
+    const alpha = (1 - progress) * 0.3;
+    const pulse = 1 + 0.05 * Math.sin(time * 8);
+    ctx.fillStyle = this.color;
+    ctx.globalAlpha = alpha * 0.4;
+    ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * pulse, 0, G.TWO_PI); ctx.fill();
+    ctx.strokeStyle = this.color;
+    ctx.globalAlpha = alpha * 0.8; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * pulse, 0, G.TWO_PI); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+};
+
+// ═══════════════ 轨道弹 ═══════════════
+G.OrbitalBullet = class OrbitalBullet {
+  constructor(player, dist, angle, speed, damage, radius, color) {
+    this.player = player; this.dist = dist; this.angle = angle;
+    this.speed = speed; this.damage = damage; this.radius = radius;
+    this.color = color; this.x = 0; this.y = 0;
+    this.hitCooldown = new Map();
+  }
+  draw(ctx, time) {
+    ctx.fillStyle = this.color;
+    ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, G.TWO_PI); ctx.fill();
+  }
+};
+
+// ═══════════════ 粒子系统 ═══════════════
+G.Particle = class Particle {
+  constructor() { this.reset(); }
+  reset() {
+    this.x = 0; this.y = 0;
+    this.vx = 0; this.vy = 0;
+    this.life = 0; this.maxLife = 1;
+    this.radius = 2;
+    this.color = '#fff';
+    this.alive = false;
+    this.gravity = 0;
+    this.friction = 1;
+    this.shrink = true;
+    this.type = 'circle'; // circle, spark, ring
+  }
+};
+
+G.ParticleSystem = class ParticleSystem {
+  constructor(poolSize = 500) {
+    this.pool = new G.Pool(
+      () => new G.Particle(),
+      (p) => { p.alive = false; },
+      poolSize
+    );
+  }
+
+  emit(x, y, config) {
+    const count = config.count || 10;
+    for (let i = 0; i < count; i++) {
+      const p = this.pool.get();
+      p.x = x + (G.RAND() - 0.5) * (config.spread || 0);
+      p.y = y + (G.RAND() - 0.5) * (config.spread || 0);
+      const angle = config.angle != null
+        ? config.angle + (G.RAND() - 0.5) * (config.angleSpread || G.TWO_PI)
+        : G.RAND() * G.TWO_PI;
+      const speed = G.randFloat(config.speedMin || 50, config.speedMax || 200);
+      p.vx = Math.cos(angle) * speed;
+      p.vy = Math.sin(angle) * speed;
+      p.life = 0;
+      p.maxLife = G.randFloat(config.lifeMin || 0.3, config.lifeMax || 0.8);
+      p.radius = G.randFloat(config.radiusMin || 1, config.radiusMax || 3);
+      p.color = config.color || '#fff';
+      p.gravity = config.gravity || 0;
+      p.friction = config.friction || 0.98;
+      p.shrink = config.shrink !== false;
+      p.type = config.type || 'circle';
+      p.alive = true;
+    }
+  }
+
+  // 预设特效
+  explosion(x, y, color = '#f84', radius = 30) {
+    this.emit(x, y, {
+      count: 20,
+      speedMin: 80, speedMax: 250,
+      lifeMin: 0.2, lifeMax: 0.6,
+      radiusMin: 1, radiusMax: 4,
+      color: color,
+      spread: radius * 0.5,
+    });
+    // 火花
+    this.emit(x, y, {
+      count: 8,
+      speedMin: 200, speedMax: 400,
+      lifeMin: 0.1, lifeMax: 0.3,
+      radiusMin: 0.5, radiusMax: 1.5,
+      color: '#fff',
+      type: 'spark',
+    });
+  }
+
+  hitSpark(x, y, color = '#ff4') {
+    this.emit(x, y, {
+      count: 6,
+      speedMin: 60, speedMax: 150,
+      lifeMin: 0.1, lifeMax: 0.25,
+      radiusMin: 1, radiusMax: 2.5,
+      color: color,
+      angleSpread: Math.PI,
+    });
+  }
+
+  deathBurst(x, y, color, radius) {
+    this.emit(x, y, {
+      count: 30,
+      speedMin: 100, speedMax: 350,
+      lifeMin: 0.3, lifeMax: 0.8,
+      radiusMin: 2, radiusMax: 5,
+      color: color,
+      spread: radius,
+    });
+    // 环形波
+    this.emit(x, y, {
+      count: 16,
+      speedMin: 150, speedMax: 200,
+      lifeMin: 0.3, lifeMax: 0.5,
+      radiusMin: 1, radiusMax: 2,
+      color: '#fff',
+      type: 'ring',
+    });
+  }
+
+  freezeBurst(x, y) {
+    this.emit(x, y, {
+      count: 12,
+      speedMin: 40, speedMax: 120,
+      lifeMin: 0.3, lifeMax: 0.6,
+      radiusMin: 1, radiusMax: 3,
+      color: '#8df',
+      spread: 10,
+    });
+  }
+
+  // 闪电链视觉：两点间锯齿电弧
+  lightning(x1, y1, x2, y2, color = '#ff0') {
+    const d = Math.hypot(x2 - x1, y2 - y1);
+    const n = Math.max(3, Math.floor(d / 22));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const edge = i === 0 || i === n;
+      this.emit(x1 + (x2 - x1) * t + (edge ? 0 : (G.RAND() - 0.5) * 14),
+                y1 + (y2 - y1) * t + (edge ? 0 : (G.RAND() - 0.5) * 14), {
+        count: 1, speedMin: 5, speedMax: 30,
+        lifeMin: 0.1, lifeMax: 0.2,
+        radiusMin: 1, radiusMax: 2,
+        color: color, type: 'spark',
+      });
+    }
+  }
+
+  update(dt) {
+    this.pool.update(dt, (p, dt) => {
+      p.life += dt;
+      if (p.life >= p.maxLife) { p.alive = false; return; }
+      p.vx *= p.friction;
+      p.vy *= p.friction;
+      p.vy += p.gravity * dt;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+    });
+  }
+
+  draw(ctx, time) {
+    const particles = this.pool.active;
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      const progress = p.life / p.maxLife;
+      const alpha = 1 - progress;
+      const r = p.shrink ? p.radius * (1 - progress * 0.7) : p.radius;
+
+      ctx.globalAlpha = alpha;
+
+      if (p.type === 'spark') {
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = r;
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.vx * 0.02, p.y - p.vy * 0.02);
+        ctx.stroke();
+      } else if (p.type === 'ring') {
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r * 3, 0, G.TWO_PI);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, G.TWO_PI);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+};
+
+// ═══════════════ AOE/特效实体 ═══════════════
+G.AOEBlast = class AOEBlast {
+  constructor(config) {
+    this.x = config.x; this.y = config.y;
+    this.maxRadius = config.radius || 50;
+    this.radius = 0;
+    this.damage = config.damage || 10;
+    this.color = config.color || '#f84';
+    this.life = 0;
+    this.maxLife = config.maxLife || 0.3;
+    this.alive = true;
+    this.hitEnemies = new Set();
+    // 持续区域属性（继承武器点数）
+    this.persistent = config.persistent || false;
+    this.dot = config.dot || 0;
+    this.burnDps = config.burnDps || 0;
+    this.freezePower = config.freezePower || 0;
+    this.shockPoints = config.shockPoints || 0;
+    this.homing = config.homing || 0;
+    this.penetration = config.penetration || 0;
+    this.bounce = config.bounce || false;
+    this.bounceMax = config.bounceMax || 0;
+    this.bounceCount = 0;
+    this.vx = config.vx || 0;
+    this.vy = config.vy || 0;
+    this.speed = config.speed || 0;
+    this.lifesteal = config.lifesteal || 0;
+    this.knockback = config.knockback || 0;
+    this.sealRatio = config.sealRatio || 0;
+    this.charmRatio = config.charmRatio || 0;
+    this.geneTime = config.geneTime || 0;
+    this.charmHeal = config.charmHeal || 0;
+    this.superAccumRatio = config.superAccumRatio || 0;
+    this.superCharmTime = config.superCharmTime || 0;
+    this.superGeneTime = config.superGeneTime || 0;
+    this.tickInterval = 0.25;
+    this.tickTimer = 0;
+  }
+
+  update(dt, enemies, events) {
+    this.life += dt;
+    if (this.life >= this.maxLife) { this.alive = false; return; }
+    // 展开动画（前0.15秒）
+    const expandTime = this.persistent ? 0.15 : this.maxLife;
+    const progress = this.life / expandTime;
+    this.radius = this.maxRadius * G.ease.outCubic(Math.min(1, progress));
+
+    // 持续区域移动逻辑
+    if (this.persistent && enemies) {
+      // 跟踪：区域缓慢追踪最近的敌人
+      if (this.homing > 0) {
+        let nearest = null, nearDist2 = 250000; // 500px范围
+        for (let i = 0; i < enemies.length; i++) {
+          const e = enemies[i];
+          if (!e.alive || e.charmed || e.phaseShift > 0) continue;
+          const dx = e.x - this.x, dy = e.y - this.y;
+          const d2 = dx*dx + dy*dy;
+          if (d2 < nearDist2) { nearDist2 = d2; nearest = e; }
+        }
+        if (nearest) {
+          const targetAngle = Math.atan2(nearest.y - this.y, nearest.x - this.x);
+          const moveSpeed = 60 + this.homing * 200; // 跟踪越强，移动越快
+          this.x += Math.cos(targetAngle) * moveSpeed * dt;
+          this.y += Math.sin(targetAngle) * moveSpeed * dt;
+        }
+      }
+      // 弹射：区域移动并在边界反弹
+      if (this.bounce && this.speed > 0) {
+        this.x += this.vx * dt;
+        this.y += this.vy * dt;
+        if (this.x < 0 || this.x > G.renderer.width) {
+          this.vx *= -1; this.bounceCount++;
+          this.x = G.clamp(this.x, 0, G.renderer.width);
+        }
+        if (this.y < 0 || this.y > G.renderer.height) {
+          this.vy *= -1; this.bounceCount++;
+          this.y = G.clamp(this.y, 0, G.renderer.height);
+        }
+        if (this.bounceCount > this.bounceMax) { this.bounce = false; this.speed = 0; }
+      }
+
+      // 持续区域：每0.25秒伤害范围内的敌人
+      this.tickTimer += dt;
+      if (this.tickTimer >= this.tickInterval && this.radius > 0) {
+        this.tickTimer = 0;
+        const r2 = this.radius * this.radius;
+        for (let i = 0; i < enemies.length; i++) {
+          const e = enemies[i];
+          if (!e.alive || e.charmed || e.phaseShift > 0) continue;
+          const dx = e.x - this.x, dy = e.y - this.y;
+          if (dx*dx + dy*dy < r2) {
+            let tickDmg = this.damage * this.tickInterval;
+            // 叠加态区域：合并累计，满值先临时魅惑、到期后封印
+            if (this.superAccumRatio > 0 && !e.charmed && !e.traits.includes('boss')) {
+              e.bubbleGrow();
+              e.superAccum = (e.superAccum || 0) + this.damage * this.superAccumRatio * this.tickInterval;
+              if (e.superAccum >= e.maxHp) {
+                e.convertToAlly(this.charmHeal);
+                e.superTimer = this.superCharmTime;
+                e.superGeneTime = this.superGeneTime;
+                events.emit('enemy:charmed', { enemy: e });
+              }
+            } else if (this.charmRatio > 0) {
+              if (!e.charmed) {
+                e.bubbleGrow(); // 魅惑命中同样触发泡泡变大
+                e.charmAccum = (e.charmAccum || 0) + this.damage * this.charmRatio * this.tickInterval;
+                if (e.charmAccum >= e.maxHp) { e.convertToAlly(this.charmHeal); events.emit('enemy:charmed', { enemy: e }); }
+              }
+            } else if (this.sealRatio > 0 && !e.traits.includes('boss')) {
+              // 封印区域：不造成伤害，只累计封印；满值吸收目标并夺取其基因
+              e.bubbleGrow(); // 封印命中同样触发泡泡变大
+              e.sealAccum = (e.sealAccum || 0) + this.damage * this.sealRatio * this.tickInterval;
+              if (e.sealAccum >= e.maxHp) {
+                const gx = e.x, gy = e.y, trait = e.traits[0] || 'normal';
+                e.absorb(events); // 封印吸收：静默击杀
+                G.particles.explosion(gx, gy, '#a6f', e.radius * 1.5);
+                G.gainGene(trait, this.geneTime, gx, gy);
+              }
+            } else {
+              e.takeDamage(tickDmg, events);
+            }
+            // 击退：范围伤害也能继承
+            if (this.knockback > 0 && e.alive && G.player) {
+              const ang = G.angle(G.player.x, G.player.y, e.x, e.y);
+              e.vx += Math.cos(ang) * this.knockback * 2;
+              e.vy += Math.sin(ang) * this.knockback * 2;
+            }
+            // 吸血
+            if (this.lifesteal > 0 && G.player && G.player.alive) {
+              G.player.hp = Math.min(G.player.maxHp, G.player.hp + this.lifesteal * this.tickInterval);
+            }
+            // 慢性毒药：区域内刷新中毒（固定伤害+刷新时长）
+            if (this.dot > 0 && e.alive) e.applyDOT(4, 2);
+            // 燃烧：伤害随时间递增，不叠加
+            if (this.burnDps > 0 && e.alive) e.applyBurn(this.burnDps, 2);
+            // 冰冻：叠加减速，满值冰冻
+            if (this.freezePower > 0 && e.alive) {
+              e.applyFreeze(this.freezePower * 0.5);
+            }
+            // 感电：减速
+            if (this.shockPoints > 0 && e.alive) {
+              e.applyShock();
+            }
+          }
+        }
+      }
+    }
+  }
+
+  draw(ctx, time) {
+    const progress = this.life / this.maxLife;
+    if (this.persistent) {
+      // 持续区域渲染：脉冲效果
+      const pulse = 1 + 0.03 * Math.sin((time || 0) * 6);
+      const fadeOut = this.life > this.maxLife * 0.8 ? (1 - (this.life - this.maxLife*0.8) / (this.maxLife*0.2)) : 1;
+      const alpha = (0.12 + 0.05 * Math.sin((time || 0) * 4)) * fadeOut;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = this.color;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * pulse, 0, G.TWO_PI); ctx.fill();
+      ctx.globalAlpha = alpha * 1.5;
+      ctx.strokeStyle = this.color; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.radius * pulse, 0, G.TWO_PI); ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else {
+      // 原有短暂爆炸效果
+      const alpha = (1 - progress) * 0.5;
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = 3 * (1 - progress);
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, G.TWO_PI);
+      ctx.stroke();
+      ctx.fillStyle = this.color;
+      ctx.globalAlpha = alpha * 0.2;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, G.TWO_PI);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+};
+
+G.BlackHole = class BlackHole {
+  constructor(x, y, duration = 2) {
+    this.x = x; this.y = y;
+    this.radius = 30;
+    this.pullForce = 200;
+    this.life = 0;
+    this.maxLife = duration;
+    this.alive = true;
+  }
+
+  update(dt, enemies) {
+    this.life += dt;
+    if (this.life >= this.maxLife) { this.alive = false; return; }
+
+    // 拉拽敌人
+    for (let i = 0; i < enemies.length; i++) {
+      const e = enemies[i];
+      if (!e.alive) continue;
+      const d = G.dist(this.x, this.y, e.x, e.y);
+      if (d < 200 && d > 5) {
+        const force = this.pullForce / (d * 0.5);
+        const ang = G.angle(e.x, e.y, this.x, this.y);
+        e.vx += Math.cos(ang) * force * dt * 60;
+        e.vy += Math.sin(ang) * force * dt * 60;
+      }
+    }
+  }
+
+  draw(ctx, time) {
+    const progress = this.life / this.maxLife;
+    const alpha = progress < 0.1 ? progress * 10 : progress > 0.8 ? (1 - progress) * 5 : 1;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.globalAlpha = alpha;
+
+    // 黑洞核心
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+    grad.addColorStop(0, 'rgba(20,0,40,0.9)');
+    grad.addColorStop(0.5, 'rgba(60,20,120,0.4)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius, 0, G.TWO_PI);
+    ctx.fill();
+
+    // 旋转环
+    ctx.strokeStyle = `rgba(150,80,255,${0.5 * alpha})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const r = this.radius * (0.5 + i * 0.3);
+      const a = time * (3 + i) + i * 2;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r, r * 0.3, a, 0, G.TWO_PI);
+      ctx.stroke();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+};
+
+// 链式闪电效果
+G.ChainLightning = class ChainLightning {
+  constructor(points, damage) {
+    this.points = points; // [{x,y}, ...]
+    this.damage = damage;
+    this.life = 0;
+    this.maxLife = 0.25;
+    this.alive = true;
+  }
+
+  update(dt) {
+    this.life += dt;
+    if (this.life >= this.maxLife) this.alive = false;
+  }
+
+  draw(ctx) {
+    const progress = this.life / this.maxLife;
+    const alpha = 1 - progress;
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = '#8df';
+    ctx.lineWidth = 3 * (1 - progress);
+    ctx.shadowColor = '#4af';
+    ctx.shadowBlur = 10;
+
+    for (let i = 0; i < this.points.length - 1; i++) {
+      const p1 = this.points[i];
+      const p2 = this.points[i + 1];
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      // 锯齿闪电
+      const segments = 5;
+      for (let j = 1; j <= segments; j++) {
+        const t = j / segments;
+        const mx = G.lerp(p1.x, p2.x, t) + (j < segments ? (G.RAND() - 0.5) * 15 : 0);
+        const my = G.lerp(p1.y, p2.y, t) + (j < segments ? (G.RAND() - 0.5) * 15 : 0);
+        ctx.lineTo(mx, my);
+      }
+      ctx.stroke();
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  }
+};
+
+console.log('[Game] entities.js loaded');
+
+
+// ===== weapons.js =====
+// ═══════════════════════════════════════════════════════
+// weapons.js — 加点系统 v3 / 11项武器属性 / 动态命名 / 子弹形态 / 射击系统
+// ═══════════════════════════════════════════════════════
+// (G = window.Game)
+// ═══════════════ 模板预设（权重型，自动按可用点数分配） ═══════════════
+G.WeaponPresets = {
+  machinegun: { name: 'Machine Gun', icon: 'machinegun',
+    weights: { power:2, rate:3, pierce:0, homing:0, burst:0, split:0, lifetime:1, dot:0, zone:0, bounce:0, burn:0, freeze:0, shock:0 }},
+  shotgun: { name: 'Shotgun', icon: 'shotgun',
+    weights: { power:2, rate:0, pierce:0, homing:0, burst:4, split:1, lifetime:1, dot:0, zone:0, bounce:0, burn:0, freeze:0, shock:0 }},
+  laser: { name: 'Laser', icon: 'laser',
+    weights: { power:0, rate:4, pierce:2, homing:0, burst:0, split:0, lifetime:2, dot:1, zone:0, bounce:0, burn:0, freeze:0, shock:1 }},
+  rocket: { name: 'Rocket', icon: 'rocket',
+    weights: { power:3, rate:0, pierce:0, homing:1, burst:0, split:0, lifetime:1, dot:0, zone:2, bounce:0, burn:2, freeze:0, shock:0 }},
+  plasma: { name: 'Plasma', icon: 'plasma',
+    weights: { power:1, rate:1, pierce:0, homing:2, burst:0, split:0, lifetime:1, dot:1, zone:0, bounce:1, burn:0, freeze:1, shock:0 }},
+  sniper: { name: 'Sniper', icon: 'sniper',
+    weights: { power:4, rate:0, pierce:2, homing:0, burst:0, split:0, lifetime:4, dot:0, zone:0, bounce:0, burn:0, freeze:0, shock:0 }},
+};
+
+// 根据权重和可用点数生成实际分配
+G.buildPresetPoints = function(key, availablePoints) {
+  const preset = G.WeaponPresets[key];
+  if (!preset) return null;
+  const w = preset.weights;
+  const totalWeight = Object.values(w).reduce((s, v) => s + v, 0);
+  if (totalWeight === 0) return {};
+  // 武器点数 = 可用点数 - 1（留1点给船体hull）
+  const weaponBudget = Math.max(3, availablePoints - 1);
+  const points = {};
+  let allocated = 0;
+  const keys = Object.keys(w).filter(k => w[k] > 0).sort((a, b) => w[b] - w[a]);
+  for (const k of keys) {
+    const raw = (w[k] / totalWeight) * weaponBudget;
+    const val = Math.max(1, Math.min(G.POINT_MAX, Math.round(raw)));
+    points[k] = val;
+    allocated += val;
+  }
+  // 超出预算时从最大项减去
+  while (allocated > weaponBudget && keys.length > 0) {
+    const maxKey = keys.reduce((a, b) => (points[a] || 0) >= (points[b] || 0) ? a : b);
+    if (points[maxKey] > 1) { points[maxKey]--; allocated--; }
+    else break;
+  }
+  // 填充零值项（覆盖全部武器属性，含新增项）
+  for (const k of Object.keys(G.StatMeta)) { if (!(k in points)) points[k] = 0; }
+  return points;
+};
+
+// ═══════════════ 加点配置（统一点数池） ═══════════════
+G.POINT_TOTAL = 60;
+G.POINT_START = 7;
+G.POINT_MAX = 20;
+G.INIT_CARD_COUNT = 20;  // 战前随机加点卡牌数（模板可突破）
+G.WAVE_CARD_COUNT = 10;  // 通关后随机加点卡牌数（无模板）
+
+// ── 武器：点数 → 属性 转换 ──
+G.StatCalc = {
+  power:    p => 5 + p * 8,
+  rate:     p => 3 + p * 1.8,
+  pierce:   p => p,
+  homing:   p => p * 0.08,
+  burst:    p => 1 + p,
+  split:    p => p,
+  lifetime: p => 1.5 + p * 0.5,
+  dot:      p => p * 4, // 慢性毒药持续时间（固定4伤害/秒，点数只加时长）
+  zone:     p => p * 14,
+  bounce:   p => p,
+  burn:     p => p * 4,
+  freeze:   p => 5 + p * 5,          // 冰冻：每命中叠加值(%)，叠加值=减速%，满100%冰冻
+  shock:    p => p,                  // 感电：点数=连锁跳数
+  lifesteal: p => p * 1.0,          // 每次命中吸取点数点血量
+  knockback: p => p * 16,           // 击退力度（远离玩家）
+    seal:      p => p > 0 ? 0.30 : 0, // 每命中累计子弹伤害的30%为封印；点数=封印后基因掠夺时长(每点10秒)
+  charm:     p => p > 0 ? 0.10 : 0, // 每命中累计子弹伤害的10%为魅惑；点数=友军每秒回血(每点+1)
+  drone:     p => p,                // 无人机数量：替代基础射击，由无人机发射母船子弹
+  striker:   p => p,                // 进攻无人机数量：冲锋攻击（冲锋1秒射击，冷却1秒可规避）
+};
+
+G.StatMeta = {
+  power:    { label: 'stat_power', icon: 'power', desc: 'stat_desc_power' },
+  rate:     { label: 'stat_rate', icon: 'rate', desc: 'stat_desc_rate' },
+  pierce:   { label: 'stat_pierce', icon: 'pierce', desc: 'stat_desc_pierce' },
+  homing:   { label: 'stat_homing', icon: 'homing', desc: 'stat_desc_homing' },
+  burst:    { label: 'stat_burst', icon: 'burst', desc: 'stat_desc_burst' },
+  split:    { label: 'stat_split', icon: 'split', desc: 'stat_desc_split' },
+  lifetime: { label: 'stat_lifetime', icon: 'lifetime', desc: 'stat_desc_lifetime' },
+  dot:      { label: 'stat_dot', icon: 'dot', desc: 'stat_desc_dot' },
+  zone:     { label: 'stat_zone', icon: 'zone', desc: 'stat_desc_zone' },
+  bounce:   { label: 'stat_bounce', icon: 'bounce', desc: 'stat_desc_bounce' },
+  burn:     { label: 'stat_burn', icon: 'burn', desc: 'stat_desc_burn' },
+  freeze:   { label: 'stat_freeze', icon: 'freeze', desc: 'stat_desc_freeze' },
+  shock:    { label: 'stat_shock', icon: 'shock', desc: 'stat_desc_shock' },
+  lifesteal: { label: 'stat_lifesteal', icon: 'lifesteal', desc: 'stat_desc_lifesteal' },
+  knockback: { label: 'stat_knockback', icon: 'knockback', desc: 'stat_desc_knockback' },
+  seal:     { label: 'stat_seal', icon: 'seal', desc: 'stat_desc_seal' },
+  charm:    { label: 'stat_charm', icon: 'charm', desc: 'stat_desc_charm' },
+  drone:    { label: 'stat_drone', icon: 'drone', desc: 'stat_desc_drone' },
+  striker:  { label: 'stat_striker', icon: 'striker', desc: 'stat_desc_striker' },
+};
+
+// ── 飞船：点数 → 属性 ──
+G.ShipCalc = {
+  hull:    p => 100 + p * 25,
+  regen:   p => p * 2,
+  reflect: p => p * 3,
+  shield:  p => p * 15,
+  reactive: p => p, // 反应装甲：每次受击触发 点数 次反应，每次发射一整轮武器齐射
+  guard:   p => p, // 防御无人机：每点1架，继承10%母船属性环绕护卫（不攻击）
+};
+G.ShipMeta = {
+  hull:    { label: 'ship_hull', icon: 'hull', desc: 'ship_desc_hull' },
+  regen:   { label: 'ship_regen', icon: 'regen', desc: 'ship_desc_regen' },
+  reflect: { label: 'ship_reflect', icon: 'reflect', desc: 'ship_desc_reflect' },
+  shield:  { label: 'ship_shield', icon: 'shield', desc: 'ship_desc_shield' },
+  reactive: { label: 'ship_reactive', icon: 'reactive', desc: 'ship_desc_reactive' },
+  guard:   { label: 'ship_guard', icon: 'guard', desc: 'ship_desc_guard' },
+};
+
+// ═══════════════ 武器构建 ═══════════════
+G.buildWeaponFromPoints = function(pts) {
+  const c = G.StatCalc;
+  const damage = c.power(pts.power);
+  const fireRate = c.rate(pts.rate);
+  const penetration = c.pierce(pts.pierce);
+  const homing = c.homing(pts.homing);
+  const burst = c.burst(pts.burst);
+  const split = c.split(pts.split);
+  const maxLife = c.lifetime(pts.lifetime);
+  const dot = c.dot(pts.dot);
+  const zoneRadius = c.zone(pts.zone);
+  const bounce = c.bounce(pts.bounce);
+  const burnDps = c.burn(pts.burn || 0);
+  const freezePower = c.freeze(pts.freeze || 0);
+  const shockPoints = c.shock(pts.shock || 0);
+  const lifesteal = c.lifesteal(pts.lifesteal || 0);
+  const knockback = c.knockback(pts.knockback || 0);
+  const sealRatio = c.seal(pts.seal || 0);
+  const charmRatio = pts.charm ? c.charm(pts.charm) : 0;
+  const geneTime = (pts.seal || 0) * 10; // 封印完成后夺取基因时长（每点+10秒）
+  const charmHeal = pts.charm || 0;     // 魅惑转化后友军每秒回血（每点+1）
+  const droneCount = pts.drone || 0;    // 无人机数量（>0时替代基础射击）
+  const strikerCount = pts.striker || 0; // 进攻无人机数量（冲锋攻击）
+  // 叠加态：魅惑+封印同时存在时合并为单一累计，满值先魅惑后封印
+  const superMode = sealRatio > 0 && charmRatio > 0;
+  const superAccumRatio = superMode ? sealRatio + charmRatio : 0;
+  const charmProp = superMode ? charmRatio / superAccumRatio : 0; // 魅惑伤害比例
+  const sealProp = superMode ? sealRatio / superAccumRatio : 0;   // 封印伤害比例
+  const superCharmTime = superMode ? 20 * (pts.charm || 0) * charmProp : 0; // 临时魅惑时长
+  const superGeneTime = superMode ? geneTime * sealProp : 0;                // 封印后基因时长
+  const bulletSpeed = 500 + pts.power * 30;
+  const spread = burst > 1 ? 0.12 + burst * 0.05 : 0.01;
+  const bulletRadius = 2.5 + pts.power * 0.15 + pts.zone * 0.03;
+  const color = G.computeBulletColor(pts);
+  const trailColor = (() => {
+    const r = parseInt(color.slice(1,3),16), g = parseInt(color.slice(3,5),16), b = parseInt(color.slice(5,7),16);
+    return `rgba(${r},${g},${b},0.3)`;
+  })();
+
+  return {
+    name: G.generateWeaponName(pts), points: { ...pts },
+    damage, fireRate, bulletSpeed, penetration, homing, burst, split,
+    maxLife, dot, zoneRadius, bounce, burnDps, freezePower, shockPoints,
+    lifesteal, knockback, sealRatio, charmRatio, geneTime, charmHeal,
+    droneCount, strikerCount, superAccumRatio, superCharmTime, superGeneTime,
+    bulletRadius, color, trailColor, spread,
+    bulletShape: G.computeBulletShape(pts), specials: {},
+  };
+};
+
+G.buildShipFromPoints = function(pts) {
+  const c = G.ShipCalc;
+  return {
+    maxHp: c.hull(pts.hull),
+    regen: c.regen(pts.regen),
+    reflect: c.reflect(pts.reflect),
+    maxShield: c.shield(pts.shield),
+    reactive: c.reactive(pts.reactive || 0),
+    guard: c.guard(pts.guard || 0),
+    points: { ...pts },
+    visual: G.computeShipVisual(pts),
+  };
+};
+
+// ═══════════════ 动态命名（精准反映加点组合：主词条定武器型、副词条定前缀、高点点分级强化） ═══════════════
+G.generateWeaponName = function(pts) {
+  const zh = G.currentLang === 'zh';
+  const sorted = Object.keys(pts).map(k => ({ key: k, val: pts[k] })).filter(s => s.val > 0).sort((a, b) => b.val - a.val);
+  if (!sorted.length) return zh ? '基础脉冲炮' : 'Light Pulse';
+  const top = sorted[0], second = sorted[1];
+  if (top.val < 3) return zh ? '轻型脉冲炮' : 'Light Pulse';
+  // 前缀=次要特质，后缀=主要武器型
+  const P = { power:'毁灭', rate:'急速', pierce:'贯穿', homing:'追踪', burst:'散射',
+    split:'分裂', lifetime:'远程', dot:'腐蚀', zone:'轰炸', bounce:'弹射',
+    burn:'灼烧', freeze:'冰封', shock:'雷霆',
+    lifesteal:'汲血', knockback:'震荡', seal:'封印', charm:'魅惑', drone:'蜂群', striker:'突袭', __curse:'咒誓' };
+  const S = { power:'重炮', rate:'连射', pierce:'穿甲弹', homing:'导弹', burst:'弹幕',
+    split:'裂变', lifetime:'狙击', dot:'剧毒', zone:'领域', bounce:'回旋',
+    burn:'烈焰', freeze:'寒霜', shock:'电击',
+    lifesteal:'血饮', knockback:'冲拳', seal:'咒印', charm:'迷心', drone:'机巢', striker:'突击' };
+  const PE = { power:'Doom', rate:'Rapid', pierce:'Piercing', homing:'Homing', burst:'Scatter',
+    split:'Split', lifetime:'Longshot', dot:'Corrosive', zone:'Blast', bounce:'Ricochet',
+    burn:'Scorch', freeze:'Frost', shock:'Thunder',
+    lifesteal:'Vampiric', knockback:'Slam', seal:'Sealing', charm:'Charming', drone:'Drone', striker:'Striker', __curse:'Hexbound' };
+  const SE = { power:'Cannon', rate:'Barrage', pierce:'Railgun', homing:'Missile', burst:'Storm',
+    split:'Fission', lifetime:'Sniper', dot:'Venom', zone:'Field', bounce:'Boomerang',
+    burn:'Inferno', freeze:'Cryo', shock:'Lightning',
+    lifesteal:'Leech', knockback:'Knocker', seal:'Rune', charm:'Siren', drone:'Hive', striker:'Raptor' };
+  // 分级前缀：主词条点数越高，品阶越高
+  const tier = top.val >= 14 ? (zh ? '神话·' : 'Mythic ') : top.val >= 9 ? (zh ? '超·' : 'Ultra ') : '';
+  // 副词条判定：第二高点数达到主词条一半且不少于3；封印+魅惑共存时启用专属组合词条"咒誓"
+  let prefixKey = null;
+  const curseCombo = (pts.seal || 0) > 0 && (pts.charm || 0) > 0 && top.key !== 'seal' && top.key !== 'charm';
+  if (curseCombo) prefixKey = '__curse';
+  else if (second && second.val >= Math.max(3, Math.ceil(top.val * 0.5))) prefixKey = second.key;
+  if (zh) {
+    if (prefixKey) return tier + P[prefixKey] + S[top.key];
+    if (top.val >= 6) return tier + P[top.key] + S[top.key];
+    return tier + P[top.key] + '弹';
+  }
+  if (prefixKey) return tier + PE[prefixKey] + ' ' + SE[top.key];
+  if (top.val >= 6) return tier + PE[top.key] + ' ' + SE[top.key];
+  return tier + PE[top.key] + ' Bolt';
+};
+
+// ═══════════════ 子弹颜色 ═══════════════
+G.computeBulletColor = function(pts) {
+  const hueMap = { power:0, rate:200, pierce:50, homing:280, burst:30,
+    split:310, lifetime:170, dot:15, zone:25, bounce:130, burn:10, freeze:190, shock:260,
+    lifesteal:330, knockback:45, seal:275, charm:315, drone:160, striker:95 };
+  let tw = 0, hs = 0;
+  for (const k of Object.keys(pts)) { if (pts[k] > 0) { hs += hueMap[k] * pts[k]; tw += pts[k]; } }
+  if (!tw) return '#aaccff';
+  return G.hslToHex(Math.round(hs / tw), 75 + Math.min(tw, 15), 60);
+};
+G.hslToHex = function(h, s, l) {
+  s /= 100; l /= 100;
+  const a = s * Math.min(l, 1 - l);
+  const f = n => { const k = (n + h/30) % 12; return Math.round(255 * (l - a * Math.max(Math.min(k-3, 9-k, 1), -1))).toString(16).padStart(2,'0'); };
+  return `#${f(0)}${f(8)}${f(4)}`;
+};
+
+// ═══════════════ 子弹形态 ═══════════════
+G.computeBulletShape = function(pts) {
+  const keys = Object.keys(pts);
+  const total = keys.reduce((s, k) => s + pts[k], 0) || 1;
+  const weights = {}; for (const k of keys) weights[k] = pts[k] / total;
+  const shapeMap = { power:'orb', rate:'streak', pierce:'needle', homing:'crescent',
+    burst:'cluster', split:'cluster', lifetime:'dart', dot:'orb', zone:'star', bounce:'dart',
+    burn:'star', freeze:'needle', shock:'streak', drone:'cluster' };
+  const sorted = keys.map(k => ({ key: k, w: weights[k] })).sort((a, b) => b.w - a.w);
+  const d = sorted[0];
+  return { primary: shapeMap[d.key]||'orb', secondary: sorted.length>1?(shapeMap[sorted[1].key]||'orb'):'orb',
+    blend: sorted.length>1 ? sorted[1].w/(d.w+0.01) : 0, intensity: d.w };
+};
+
+// ═══════════════ 飞船外观 ═══════════════
+G.computeShipVisual = function(pts) {
+  const total = pts.hull + pts.regen + pts.reflect + pts.shield + (pts.reactive || 0) + (pts.guard || 0);
+  const hueMap = { hull: 0, regen: 120, reflect: 30, shield: 210, reactive: 45, guard: 180 };
+  let tw = 0, hs = 0;
+  for (const k of Object.keys(pts)) { if (pts[k] > 0 && hueMap[k] !== undefined) { hs += hueMap[k] * pts[k]; tw += pts[k]; } }
+  const hue = tw > 0 ? Math.round(hs / tw) : 210;
+  return {
+    scale: 1 + total * 0.015,
+    hue: hue,
+    hasShield: pts.shield > 0,
+    hasSpikes: pts.reflect > 0,
+    hasAura: pts.regen > 2,
+    color: G.hslToHex(hue, 70, 55),
+  };
+};
+
+// ═══════════════ 武器系统 ═══════════════
+G.WeaponSystem = class WeaponSystem {
+  constructor(bulletPool, events, particles) {
+    this.bulletPool = bulletPool; this.events = events; this.particles = particles;
+    this.weapon = null;
+    this.aoeBlasts = []; this.blackholes = []; this.chainLightnings = [];
+    this.damageZones = []; this.orbitalBullets = [];
+  }
+  setWeapon(w) { this.weapon = w; }
+
+  fire(player, mx, my) {
+    const w = this.weapon; if (!w) return;
+    const baseAngle = G.angle(player.x, player.y, mx, my);
+    this.fireVolley(player.x + Math.cos(baseAngle) * 26, player.y + Math.sin(baseAngle) * 26, baseAngle, player);
+  }
+
+  // 唯一子弹参数来源：武器全属性+基因加成（反应装甲/主射击/无人机共用，杜绝字段分叉）
+  // dmgMult：伤害倍率（反应装甲为0.5）；封印/魅惑/叠加态等累计字段原样继承
+  bulletSpec(x, y, angle, dmgMult = 1) {
+    const w = this.weapon;
+    const geneDamage = w.damage * dmgMult * (G.hasGene('normal') ? 1.2 : 1);
+    const geneSplit = w.split + (G.hasGene('splitter') ? 2 : 0);
+    return {
+      x, y,
+      vx: Math.cos(angle) * w.bulletSpeed, vy: Math.sin(angle) * w.bulletSpeed,
+      angle, speed: w.bulletSpeed, damage: geneDamage, radius: w.bulletRadius,
+      penetration: w.penetration, homing: w.homing, aoe: 0, split: geneSplit,
+      color: w.color, trailColor: w.trailColor, bulletShape: w.bulletShape,
+      maxLife: w.maxLife, owner: 'player', isChild: false,
+      bounce: w.bounce > 0, bounceMax: w.bounce,
+      dot: w.dot, zoneRadius: w.zoneRadius, zoneDps: 0,
+      burnDps: w.burnDps, freezePower: w.freezePower, shockPoints: w.shockPoints,
+      lifesteal: w.lifesteal, knockback: w.knockback,
+      sealRatio: w.sealRatio, charmRatio: w.charmRatio,
+      geneTime: w.geneTime, charmHeal: w.charmHeal,
+      superAccumRatio: w.superAccumRatio, superCharmTime: w.superCharmTime, superGeneTime: w.superGeneTime,
+    };
+  }
+
+  // 从指定位置/角度发射一轮齐射（burst颗），主射击/无人机/反应装甲共用的唯一发射路径
+  // dmgMult：伤害倍率（反应装甲为0.5）；子弹参数统一由 bulletSpec 生成
+  fireVolley(x, y, angle, src, dmgMult = 1) {
+    const w = this.weapon; if (!w) return;
+    const n = w.burst || 1;
+    for (let b = 0; b < n; b++) {
+      let a;
+      if (n > 1) a = angle - w.spread + (b / (n - 1)) * w.spread * 2;
+      else a = angle + (G.RAND() - 0.5) * w.spread * 2;
+      const bullet = this.bulletPool.get();
+      bullet.init(this.bulletSpec(x, y, a, dmgMult));
+      this.events.emit('weapon:fire', { bullet });
+      if (src) this.particles.emit(x, y, {
+        count: 3, speedMin: 30, speedMax: 80, lifeMin: 0.05, lifeMax: 0.15,
+        radiusMin: 1, radiusMax: 2, color: w.color, angle: angle + Math.PI, angleSpread: 0.5 });
+    }
+  }
+
+  // 反应装甲：受击时触发 count 次反应，每次从受伤部位向伤害源发射一整轮武器齐射
+  // 点数=反应次数（非弹数）；齐射完整继承弹数(burst)与全部词条，伤害减半
+  fireReactive(player, angle, count) {
+    const w = this.weapon; if (!w) return;
+    const x = player.x + Math.cos(angle) * player.radius;
+    const y = player.y + Math.sin(angle) * player.radius;
+    for (let i = 0; i < count; i++) {
+      const a = angle + (count > 1 ? (i / (count - 1) - 0.5) * 0.4 : 0);
+      this.fireVolley(x, y, a, null, 0.5);
+    }
+    this.particles.emit(player.x + Math.cos(angle) * player.radius, player.y + Math.sin(angle) * player.radius, {
+      count: 6, speedMin: 40, speedMax: 120, lifeMin: 0.1, lifeMax: 0.25,
+      radiusMin: 1, radiusMax: 2, color: '#fd4', angle: angle, angleSpread: 1.0 });
+  }
+
+  handleBulletHit(bullet, enemy) {
+    if (bullet.hitEnemies.has(enemy) && !bullet.pierceAll) return false;
+    // 反射者：正面减伤
+    if (enemy.traits.includes('reflector')) {
+      const angToBullet = G.angle(enemy.x, enemy.y, bullet.x, bullet.y);
+      const diff = Math.abs(G.angleDiff(enemy.facingAngle || 0, angToBullet));
+      if (diff < Math.PI * 0.4) { bullet.damage *= 0.3; } // 正面仅30%伤害
+    }
+    // 相位中不可命中
+    if (enemy.phaseShift > 0) return false;
+
+    let dmg = bullet.damage;
+    let killed = false;
+
+    if (bullet.superAccumRatio > 0 && !enemy.charmed && !enemy.traits.includes('boss')) {
+      // 叠加态子弹（魅惑+封印同加点）：合并累计，满值先临时魅惑、到期后封印夺基因
+      enemy.hitFlash = 1;
+      this.events.emit('enemy:hit', { enemy, damage: 0 });
+      enemy.bubbleGrow();
+      enemy.superAccum = (enemy.superAccum || 0) + bullet.damage * bullet.superAccumRatio;
+      if (enemy.superAccum >= enemy.maxHp) {
+        enemy.convertToAlly(bullet.charmHeal || 0);
+        enemy.superTimer = bullet.superCharmTime;      // 临时魅惑时长 = 20×魅惑点数×魅惑比例
+        enemy.superGeneTime = bullet.superGeneTime;    // 封印后基因时长 = 10×封印点数×封印比例
+        this.events.emit('enemy:charmed', { enemy });
+        this.particles.explosion(enemy.x, enemy.y, '#d8aff', enemy.radius * 1.5);
+      }
+    } else if (bullet.charmRatio > 0 && !enemy.charmed) {
+      // 魅惑子弹：不造成伤害，仅累计魅惑值，达到敌人血量转化为友军（Boss也可魅惑；点数提供友军回血）
+      enemy.hitFlash = 1;
+      this.events.emit('enemy:hit', { enemy, damage: 0 });
+      enemy.bubbleGrow(); // 魅惑命中同样触发泡泡变大
+      enemy.charmAccum = (enemy.charmAccum || 0) + bullet.damage * bullet.charmRatio; // 每命中累计子弹伤害的10%
+      if (enemy.charmAccum >= enemy.maxHp) {
+        enemy.convertToAlly(bullet.charmHeal || 0);
+        this.events.emit('enemy:charmed', { enemy });
+        this.particles.explosion(enemy.x, enemy.y, '#f6c', enemy.radius * 1.5);
+      }
+    } else if (bullet.sealRatio > 0 && !enemy.traits.includes('boss')) {
+      // 封印子弹：不造成伤害，累计封印值；满值吸收目标并夺取其基因能力
+      enemy.hitFlash = 1;
+      this.events.emit('enemy:hit', { enemy, damage: 0 });
+      enemy.bubbleGrow(); // 封印命中同样触发泡泡变大
+      enemy.sealAccum = (enemy.sealAccum || 0) + bullet.damage * bullet.sealRatio; // 每命中累计子弹伤害的30%
+      if (enemy.sealAccum >= enemy.maxHp) {
+        const trait = enemy.traits[0] || 'normal';
+        enemy.absorb(this.events); // 吸收：静默击杀，绕过时间溜脱/复活/自爆/分裂
+        killed = true;
+        this.particles.explosion(enemy.x, enemy.y, '#a6f', enemy.radius * 1.5);
+        G.gainGene(trait, bullet.geneTime, enemy.x, enemy.y); // 夺取基因：每封印点10秒
+      }
+    } else {
+      killed = enemy.takeDamage(dmg, this.events);
+    }
+    this.particles.hitSpark(bullet.x, bullet.y, bullet.color);
+
+    // 吸血：命中吸取血量
+    if (bullet.lifesteal > 0 && G.player && G.player.alive) {
+      const heal = Math.min(bullet.lifesteal, G.player.maxHp - G.player.hp);
+      if (heal > 0) {
+        G.player.hp += heal;
+        this.events.emit('player:lifesteal', { amount: heal, x: enemy.x, y: enemy.y });
+      }
+    }
+    // 击退：远离玩家
+    if (bullet.knockback > 0 && enemy.alive) {
+      const ang = G.angle(G.player.x, G.player.y, enemy.x, enemy.y);
+      enemy.x += Math.cos(ang) * bullet.knockback * 0.5;
+      enemy.y += Math.sin(ang) * bullet.knockback * 0.5;
+      enemy.vx += Math.cos(ang) * bullet.knockback * 4;
+      enemy.vy += Math.sin(ang) * bullet.knockback * 4;
+    }
+
+    // 慢性毒药：固定4/秒，点数增加持续时间，伤害不增加
+    if (bullet.dot > 0 && enemy.alive) {
+      enemy.applyDOT(4, bullet.dot);
+    }
+    // 燃烧：伤害随时间递增，重复命中不叠加
+    if (bullet.burnDps > 0 && enemy.alive) {
+      enemy.applyBurn(bullet.burnDps, 3);
+    }
+    // 冰冻：命中必叠加（叠加值=减速%，满100%冰冻）
+    if (bullet.freezePower > 0 && enemy.alive) {
+      enemy.applyFreeze(bullet.freezePower);
+    }
+    // 感电：命中必触发连锁闪电（跳数=点数，每跳伤害+减速）
+    if (bullet.shockPoints > 0 && enemy.alive) {
+      this.chainShock(enemy, bullet.damage, bullet.shockPoints);
+    }
+
+    // 分裂
+    if (bullet.split > 0 && !bullet.isChild) this.splitBullet(bullet);
+
+    // 区域AOE：命中后产生持续区域，继承武器全部属性
+    if (bullet.zoneRadius > 0) {
+      const remainingLife = Math.max(0.5, bullet.maxLife - bullet.life);
+      this.createAOE(bullet.x, bullet.y, bullet.zoneRadius, bullet.damage, bullet.color, {
+        persistent: true, maxLife: remainingLife,
+        dot: bullet.dot, burnDps: bullet.burnDps,
+        freezePower: bullet.freezePower, shockPoints: bullet.shockPoints,
+        homing: bullet.homing, penetration: bullet.penetration,
+        bounce: bullet.bounce, bounceMax: bullet.bounceMax,
+        lifesteal: bullet.lifesteal, knockback: bullet.knockback,
+        sealRatio: bullet.sealRatio, charmRatio: bullet.charmRatio,
+        geneTime: bullet.geneTime, charmHeal: bullet.charmHeal,
+        superAccumRatio: bullet.superAccumRatio, superCharmTime: bullet.superCharmTime, superGeneTime: bullet.superGeneTime,
+        vx: bullet.vx * 0.3, vy: bullet.vy * 0.3, speed: bullet.speed * 0.3,
+      });
+    }
+
+    // 弹射
+    if (bullet.bounceCount < (bullet.bounceMax || 0) && !killed) {
+      let nearest = null, nd = 250;
+      const enemies = G.enemyPool.active;
+      for (let i = 0; i < enemies.length; i++) {
+        const e = enemies[i];
+        if (!e.alive || e === enemy || bullet.hitEnemies.has(e)) continue;
+        const d = G.dist(bullet.x, bullet.y, e.x, e.y);
+        if (d < nd) { nd = d; nearest = e; }
+      }
+      if (nearest) {
+        const a = G.angle(bullet.x, bullet.y, nearest.x, nearest.y);
+        bullet.vx = Math.cos(a) * bullet.speed; bullet.vy = Math.sin(a) * bullet.speed;
+        bullet.angle = a; bullet.bounceCount++;
+        bullet.hitEnemies.delete(enemy);
+        return killed;
+      }
+    }
+
+    // 穿透
+    if (bullet.pierceCount < bullet.penetration) {
+      bullet.pierceCount++; bullet.hitEnemies.add(enemy);
+    } else { bullet.alive = false; }
+    return killed;
+  }
+
+  // 感电连锁：从命中目标起向160px内最近敌人跳跃，跳数=感电点数；每跳40%子弹伤害（逐跳衰减20%）并施加3秒50%减速
+  chainShock(start, damage, points) {
+    start.applyShock();
+    G.particles.hitSpark(start.x, start.y, '#ff0');
+    const hitSet = new Set([start]);
+    let cur = start;
+    const hops = Math.min(points, 8);
+    for (let i = 0; i < hops; i++) {
+      let next = null, nd = 160 * 160;
+      const act = G.enemyPool.active;
+      for (let j = 0; j < act.length; j++) {
+        const e = act[j];
+        if (!e.alive || e.charmed || e.phaseShift > 0 || hitSet.has(e)) continue;
+        const d2 = (e.x - cur.x) * (e.x - cur.x) + (e.y - cur.y) * (e.y - cur.y);
+        if (d2 < nd) { nd = d2; next = e; }
+      }
+      if (!next) break;
+      G.particles.lightning(cur.x, cur.y, next.x, next.y, '#ff0');
+      next.takeDamage(damage * 0.4 * Math.pow(0.8, i), G.events);
+      next.applyShock();
+      hitSet.add(next);
+      cur = next;
+    }
+  }
+
+  createAOE(x, y, radius, damage, color, extra) {
+    const config = { x, y, radius, damage, color: color || '#f84', maxLife: 0.3, persistent: false, ...extra };
+    this.aoeBlasts.push(new G.AOEBlast(config));
+    this.particles.explosion(x, y, color || '#f84', radius * 0.5);
+  }
+
+  splitBullet(parent) {
+    for (let i = 0; i < parent.split; i++) {
+      const a = parent.angle + ((i + 0.5) / parent.split - 0.5) * Math.PI * 0.6;
+      const child = this.bulletPool.get();
+      child.init({
+        x: parent.x, y: parent.y, vx: Math.cos(a)*parent.speed*0.8, vy: Math.sin(a)*parent.speed*0.8,
+        angle: a, speed: parent.speed*0.8, damage: parent.damage*0.5, radius: parent.radius*0.7,
+        penetration: 0, homing: parent.homing*0.5, aoe: 0, split: 0,
+        color: parent.color, trailColor: parent.trailColor, bulletShape: parent.bulletShape,
+        maxLife: 1.5, owner: 'player', isChild: true, dot: parent.dot*0.5,
+        bounce: false, bounceMax: 0, zoneRadius: 0, zoneDps: 0,
+        burnDps: parent.burnDps*0.5, freezePower: parent.freezePower*0.5, shockPoints: Math.ceil(parent.shockPoints*0.5),
+        lifesteal: parent.lifesteal*0.5, knockback: parent.knockback*0.5,
+        sealRatio: 0, charmRatio: 0,
+      });
+    }
+  }
+
+  update(dt, enemies, player) {
+    // AOE区域
+    for (let i = this.aoeBlasts.length - 1; i >= 0; i--) {
+      const b = this.aoeBlasts[i];
+      b.update(dt, b.persistent ? enemies : null, b.persistent ? this.events : null);
+      // 非持续AOE（瞬爆）：外部碰撞检测
+      if (!b.persistent) {
+        for (const e of enemies) {
+          if (!e.alive || b.hitEnemies.has(e) || e.phaseShift > 0) continue;
+          if (G.dist(b.x, b.y, e.x, e.y) < b.radius + e.radius) {
+            e.takeDamage(b.damage, this.events); b.hitEnemies.add(e);
+          }
+        }
+      }
+      if (!b.alive) this.aoeBlasts.splice(i, 1);
+    }
+    // 持续伤害处理（无视相位）：慢性毒药固定dps；燃烧dps随燃烧时长增长，伤害不叠加
+    for (const e of enemies) {
+      if (!e.alive) continue;
+      if (e.dotDamage > 0 && e.dotTimer > 0) {
+        e.dotTimer -= dt;
+        e.hp -= e.dotDamage * dt;
+        if (e.hp <= 0) { e.alive = false; this.events.emit('enemy:death', { enemy: e }); }
+      }
+      if (!e.alive) continue;
+      if (e.burnTimer > 0) {
+        e.burnTimer -= dt; e.burnAge += dt;
+        e.hp -= e.burnDps * Math.min(6, 1 + e.burnAge) * dt;
+        if (e.hp <= 0) { e.alive = false; this.events.emit('enemy:death', { enemy: e }); }
+      } else if (e.burnDps > 0) { e.burnDps = 0; e.burnAge = 0; }
+    }
+    // 轨道弹
+    if (player) {
+      for (let i = 0; i < this.orbitalBullets.length; i++) {
+        const ob = this.orbitalBullets[i];
+        ob.angle += ob.speed * dt;
+        ob.x = player.x + Math.cos(ob.angle) * ob.dist;
+        ob.y = player.y + Math.sin(ob.angle) * ob.dist;
+        for (const e of enemies) {
+          if (!e.alive || e.phaseShift > 0) continue;
+          if (G.dist(ob.x, ob.y, e.x, e.y) < ob.radius + e.radius) {
+            if (!ob.hitCooldown.has(e) || ob.hitCooldown.get(e) <= 0) {
+              e.takeDamage(ob.damage, this.events);
+              ob.hitCooldown.set(e, 0.3);
+            }
+          }
+        }
+        // 更新冷却
+        for (const [k, v] of ob.hitCooldown) {
+          ob.hitCooldown.set(k, v - dt);
+          if (v <= 0) ob.hitCooldown.delete(k);
+        }
+      }
+    }
+    for (let i = this.blackholes.length - 1; i >= 0; i--) {
+      this.blackholes[i].update(dt, enemies);
+      if (!this.blackholes[i].alive) this.blackholes.splice(i, 1);
+    }
+    for (let i = this.chainLightnings.length - 1; i >= 0; i--) {
+      this.chainLightnings[i].update(dt);
+      if (!this.chainLightnings[i].alive) this.chainLightnings.splice(i, 1);
+    }
+  }
+
+  drawEffects(ctx, time) {
+    for (const b of this.aoeBlasts) b.draw(ctx, time);
+    for (const b of this.blackholes) b.draw(ctx, time);
+    for (const c of this.chainLightnings) c.draw(ctx);
+    for (const ob of this.orbitalBullets) ob.draw(ctx, time);
+  }
+};
+
+// ═══════════════ 绘制子弹形态 ═══════════════
+G.drawBulletShape = function(ctx, x, y, angle, radius, shape, color, time) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+  const r = radius, blend = shape.blend || 0, intensity = shape.intensity || 0.5;
+  ctx.fillStyle = color;
+
+  switch (shape.primary) {
+    case 'crescent': {
+      ctx.beginPath(); ctx.arc(0, 0, r, -Math.PI*0.7, Math.PI*0.7);
+      ctx.arc(r*0.3, 0, r*(0.5+blend*0.2), Math.PI*0.6, -Math.PI*0.6, true);
+      ctx.closePath(); ctx.fill(); break;
+    }
+    case 'needle': {
+      const len = r*(2+intensity*2);
+      ctx.beginPath(); ctx.moveTo(len, 0); ctx.lineTo(-len*0.3, -r*0.4);
+      ctx.lineTo(-len*0.5, 0); ctx.lineTo(-len*0.3, r*0.4); ctx.closePath(); ctx.fill(); break;
+    }
+    case 'star': {
+      const spikes = 5, oR = r*(1.2+intensity*0.5), iR = r*0.4;
+      ctx.beginPath();
+      for (let i = 0; i < spikes*2; i++) {
+        const a = (i/(spikes*2))*G.TWO_PI - Math.PI/2, cr = i%2===0 ? oR : iR;
+        i === 0 ? ctx.moveTo(Math.cos(a)*cr, Math.sin(a)*cr) : ctx.lineTo(Math.cos(a)*cr, Math.sin(a)*cr);
+      }
+      ctx.closePath(); ctx.fill(); break;
+    }
+    case 'cluster': {
+      const cnt = 3+Math.floor(intensity*2);
+      for (let i = 0; i < cnt; i++) {
+        const a = (i/cnt)*G.TWO_PI, d = r*0.6;
+        ctx.beginPath(); ctx.arc(Math.cos(a)*d, Math.sin(a)*d, r*0.45, 0, G.TWO_PI); ctx.fill();
+      } break;
+    }
+    case 'streak': {
+      const len = r*(2+intensity*3);
+      ctx.beginPath(); ctx.ellipse(0, 0, len, r*0.5, 0, 0, G.TWO_PI); ctx.fill(); break;
+    }
+    case 'dart': {
+      const len = r*(1.5+intensity*1.5);
+      ctx.beginPath(); ctx.moveTo(len, 0); ctx.lineTo(-r*0.5, -r*0.8);
+      ctx.lineTo(-r*0.2, 0); ctx.lineTo(-r*0.5, r*0.8); ctx.closePath(); ctx.fill(); break;
+    }
+    default: {
+      ctx.beginPath(); ctx.arc(0, 0, r*(1+intensity*0.5), 0, G.TWO_PI); ctx.fill();
+    }
+  }
+  ctx.restore();
+};
+
+console.log('[Game] weapons.js loaded (v3)');
+
+
+// ===== waves.js =====
+// ═══════════════════════════════════════════════════════
+// waves.js — 波次管理 / 敌人生成 / 难度曲线
+// ═══════════════════════════════════════════════════════
+// (G = window.Game)
+G.WaveManager = class WaveManager {
+  constructor(enemyPool, events) {
+    this.enemyPool = enemyPool;
+    this.events = events;
+    this.currentWave = 0;
+    this.waveTimer = 0;
+    this.spawnQueue = [];
+    this.spawnTimer = 0;
+    this.waveActive = false;
+    this.betweenWaves = true;
+    this.betweenTimer = 2; // 波间休息
+    this.totalEnemiesInWave = 0;
+    this.killedInWave = 0;
+  }
+
+  startNextWave() {
+    this.currentWave++;
+    this.waveActive = true;
+    this.betweenWaves = false;
+    this.killedInWave = 0;
+    this.spawnQueue = this._generateWave(this.currentWave);
+    this.totalEnemiesInWave = this.spawnQueue.length;
+    this.spawnTimer = 0;
+
+    this.events.emit('wave:start', {
+      wave: this.currentWave,
+      enemyCount: this.totalEnemiesInWave,
+    });
+  }
+
+  _generateWave(wave) {
+    const queue = [];
+    const w = wave;
+
+    // 基础敌人数量随波次增长
+    const normalCount = 3 + Math.floor(w * 1.5);
+    for (let i = 0; i < normalCount; i++) {
+      queue.push({ type: G.EnemyType.NORMAL, delay: 0.4 });
+    }
+
+    // 第2波开始加入快速敌人
+    if (w >= 2) {
+      const fastCount = Math.floor(w * 0.8);
+      for (let i = 0; i < fastCount; i++) {
+        queue.push({ type: G.EnemyType.FAST, delay: 0.3 });
+      }
+    }
+
+    // 第3波开始加入坦克
+    if (w >= 3) {
+      const tankCount = Math.max(1, Math.floor(w * 0.3));
+      for (let i = 0; i < tankCount; i++) {
+        queue.push({ type: G.EnemyType.TANK, delay: 1.0 });
+      }
+    }
+
+    // 第4波开始加入自愈者
+    if (w >= 4) {
+      const healerCount = Math.max(1, Math.floor((w - 3) * 0.5));
+      for (let i = 0; i < healerCount; i++) {
+        queue.push({ type: G.EnemyType.HEALER, delay: 0.8 });
+      }
+    }
+
+    // 第5波开始加入分裂者
+    if (w >= 5) {
+      const splitCount = Math.max(1, Math.floor((w - 4) * 0.4));
+      for (let i = 0; i < splitCount; i++) {
+        queue.push({ type: G.EnemyType.SPLITTER, delay: 0.6 });
+      }
+    }
+
+    // 第6波开始加入护盾敌人
+    if (w >= 6) {
+      const shieldCount = Math.max(1, Math.floor((w - 5) * 0.4));
+      for (let i = 0; i < shieldCount; i++) {
+        queue.push({ type: G.EnemyType.SHIELDED, delay: 0.7 });
+      }
+    }
+
+    // 第4波开始加入爆炸者
+    if (w >= 4) {
+      const expCount = Math.max(1, Math.floor((w - 3) * 0.5));
+      for (let i = 0; i < expCount; i++) {
+        queue.push({ type: G.EnemyType.EXPLOSIVE, delay: 0.4 });
+      }
+    }
+
+    // 第7波开始加入传送者
+    if (w >= 7) {
+      const teleCount = Math.max(1, Math.floor((w - 6) * 0.4));
+      for (let i = 0; i < teleCount; i++) {
+        queue.push({ type: G.EnemyType.TELEPORTER, delay: 0.5 });
+      }
+    }
+
+    // 第3波开始加入相位者
+    if (w >= 3) {
+      const phaseCount = Math.max(1, Math.floor((w - 2) * 0.4));
+      for (let i = 0; i < phaseCount; i++) {
+        queue.push({ type: G.EnemyType.PHASER, delay: 0.7 });
+      }
+    }
+
+    // 第6波开始加入反射者
+    if (w >= 6) {
+      const refCount = Math.max(1, Math.floor((w - 5) * 0.3));
+      for (let i = 0; i < refCount; i++) {
+        queue.push({ type: G.EnemyType.REFLECTOR, delay: 0.8 });
+      }
+    }
+
+    // 第2波开始加入蜂群
+    if (w >= 2) {
+      const swarmCount = Math.floor(w * 0.6);
+      for (let i = 0; i < swarmCount; i++) {
+        queue.push({ type: G.EnemyType.SWARM, delay: 0.2 });
+      }
+    }
+
+    // 第4波开始加入泡泡（越打越大越脆弱）
+    if (w >= 4) {
+      const bubbleCount = Math.max(1, Math.floor((w - 3) * 0.4));
+      for (let i = 0; i < bubbleCount; i++) {
+        queue.push({ type: G.EnemyType.BUBBLE, delay: 0.6 });
+      }
+    }
+
+    // 第5波开始加入复活者（首次死亡后复活）
+    if (w >= 5) {
+      const reviverCount = Math.max(1, Math.floor((w - 4) * 0.3));
+      for (let i = 0; i < reviverCount; i++) {
+        queue.push({ type: G.EnemyType.REVIVER, delay: 1.0 });
+      }
+    }
+
+    // 第7波开始加入时间溜脱者（伤害延迟释放）
+    if (w >= 7) {
+      const lurkerCount = Math.max(1, Math.floor((w - 6) * 0.3));
+      for (let i = 0; i < lurkerCount; i++) {
+        queue.push({ type: G.EnemyType.TIMELURKER, delay: 0.9 });
+      }
+    }
+
+    // 第4波开始加入育母之巢（无法移动，每5秒召唤敌人）
+    if (w >= 4) {
+      const nestCount = Math.max(1, Math.floor((w - 3) * 0.3));
+      for (let i = 0; i < nestCount; i++) {
+        queue.push({ type: G.EnemyType.NEST, delay: 1.5 });
+      }
+    }
+
+    // 精英词缀（第5波后概率增加）
+    const eliteChance = Math.min(0.3, (w - 4) * 0.05);
+    for (const item of queue) {
+      if (item.type === G.EnemyType.BOSS || item.type === G.EnemyType.SWARM || item.type === G.EnemyType.NEST) continue;
+      if (Math.random() < eliteChance) {
+        const types = ['speed', 'shield', 'aura'];
+        item.elite = { type: types[Math.floor(Math.random() * types.length)] };
+      }
+    }
+
+    // 每5波出Boss
+    if (w % 5 === 0) {
+      queue.push({ type: G.EnemyType.BOSS, delay: 2.0 });
+    }
+
+    // 打乱顺序（但Boss总在最后）
+    const boss = queue.filter(q => q.type === G.EnemyType.BOSS);
+    const others = queue.filter(q => q.type !== G.EnemyType.BOSS);
+    for (let i = others.length - 1; i > 0; i--) {
+      const j = Math.floor(G.RAND() * (i + 1));
+      [others[i], others[j]] = [others[j], others[i]];
+    }
+
+    return [...others, ...boss];
+  }
+
+  _spawnEnemy(type, elite) {
+    const enemy = this.enemyPool.get();
+    const w = G.renderer.width, h = G.renderer.height, margin = 50;
+    if (type === G.EnemyType.NEST) {
+      // 育母之巢无法移动，直接出生在场地内部
+      const x = G.randFloat(w * 0.25, w * 0.75);
+      const y = G.randFloat(h * 0.25, h * 0.75);
+      enemy.init(type, x, y, this.currentWave, elite);
+    } else {
+      const side = G.randInt(0, 3);
+      let x, y;
+      switch (side) {
+        case 0: x = G.randFloat(-margin, w + margin); y = -margin; break;
+        case 1: x = w + margin; y = G.randFloat(-margin, h + margin); break;
+        case 2: x = G.randFloat(-margin, w + margin); y = h + margin; break;
+        case 3: x = -margin; y = G.randFloat(-margin, h + margin); break;
+      }
+      enemy.init(type, x, y, this.currentWave, elite);
+    }
+    this.events.emit('enemy:spawn', { enemy });
+    return enemy;
+  }
+
+  // 育母之巢召唤：每5秒在巢边生成基础敌人（被魅惑的巢召唤友军后代）
+  summonFromNest(nest) {
+    if (!nest || !nest.alive) return;
+    const types = [G.EnemyType.NORMAL, G.EnemyType.FAST, G.EnemyType.SWARM];
+    const type = types[Math.floor(G.RAND() * types.length)];
+    const child = this.enemyPool.get();
+    const a = G.RAND() * G.TWO_PI;
+    child.init(type,
+      G.clamp(nest.x + Math.cos(a) * (nest.radius + 14), 20, G.renderer.width - 20),
+      G.clamp(nest.y + Math.sin(a) * (nest.radius + 14), 20, G.renderer.height - 20),
+      this.currentWave);
+    if (nest.charmed) child.convertToAlly();
+    this.events.emit('enemy:spawn', { enemy: child });
+  }
+
+  // 分裂者死亡时生成小分裂体（charmedParent=true 时生成魅惑友军后代）
+  spawnSplits(parentEnemy, charmedParent = false) {
+    for (let i = 0; i < parentEnemy.splitCount; i++) {
+      const child = this.enemyPool.get();
+      const angle = (i / parentEnemy.splitCount) * G.TWO_PI;
+      const dist = parentEnemy.radius + 10;
+      child.init(G.EnemyType.NORMAL,
+        parentEnemy.x + Math.cos(angle) * dist,
+        parentEnemy.y + Math.sin(angle) * dist,
+        this.currentWave
+      );
+      child.radius = 10;
+      child.maxHp = child.hp = Math.floor(parentEnemy.maxHp * 0.2);
+      child.speed = parentEnemy.speed * 1.5;
+      child.color = '#c4c';
+      child.scoreValue = 5;
+      if (charmedParent) { child.convertToAlly(); }
+    }
+  }
+
+  update(dt) {
+    if (this.betweenWaves) {
+      if (this.pauseBetweenWaves) return; // 等待玩家加点
+      this.betweenTimer -= dt;
+      if (this.betweenTimer <= 0) {
+        this.startNextWave();
+      }
+      return;
+    }
+
+    if (!this.waveActive) return;
+
+    // 生成队列中的敌人
+    if (this.spawnQueue.length > 0) {
+      this.spawnTimer -= dt;
+      if (this.spawnTimer <= 0) {
+        const next = this.spawnQueue.shift();
+        this._spawnEnemy(next.type, next.elite);
+        this.spawnTimer = next.delay || 0.5;
+      }
+    }
+
+    // 检查波次是否结束（魅惑的敌人算作队友，不阻塞过关）
+    if (this.spawnQueue.length === 0) {
+      let hostiles = 0;
+      const act = this.enemyPool.active;
+      for (let i = 0; i < act.length; i++) { if (act[i].alive && !act[i].charmed) hostiles++; }
+      if (hostiles === 0) {
+        this.waveActive = false;
+        this.betweenWaves = true;
+        this.betweenTimer = 3;
+        this.events.emit('wave:complete', { wave: this.currentWave });
+      }
+    }
+  }
+
+  onEnemyKilled() {
+    this.killedInWave++;
+  }
+};
+
+console.log('[Game] waves.js loaded');
+
+
+// ===== main.js =====
+// ═══════════════════════════════════════════════════════
+// main.js — 游戏初始化 / 主循环 / UI绑定 / 碰撞检测
+// ═══════════════════════════════════════════════════════
+// (G = window.Game)
+// ═══════════════ 初始化 ═══════════════
+const canvas = document.getElementById('gameCanvas');
+G.renderer = new G.Renderer(canvas);
+G.input = new G.Input(canvas);
+G.events = new G.EventBus();
+G.shake = new G.ScreenShake();
+G.hitStop = new G.HitStop();
+
+G.bulletPool = new G.Pool(() => new G.Bullet(), (b) => b.reset(), 200);
+G.enemyPool = new G.Pool(() => new G.Enemy(), (e) => e.reset(), 100);
+
+G.particles = new G.ParticleSystem(800);
+G.weaponSystem = new G.WeaponSystem(G.bulletPool, G.events, G.particles);
+G.waveManager = new G.WaveManager(G.enemyPool, G.events);
+G.gameLoop = new G.GameLoop();
+
+G.player = null;
+
+// ═══════════════ 连杀系统 ═══════════════
+G.combo = { count: 0, timer: 0, maxTime: 2, multiplier: 1 };
+
+function updateCombo(dt) {
+  if (G.combo.timer > 0) {
+    G.combo.timer -= dt;
+    if (G.combo.timer <= 0) { G.combo.count = 0; G.combo.multiplier = 1; }
+  }
+}
+function addCombo() {
+  G.combo.count++;
+  G.combo.timer = G.combo.maxTime;
+  G.combo.multiplier = 1 + Math.floor(G.combo.count / 3) * 0.5;
+  if (G.combo.multiplier > 5) G.combo.multiplier = 5;
+}
+
+// ═══════════════ 伤害数字 ═══════════════
+const damageLayer = document.getElementById('damage-layer');
+function showDamageNumber(x, y, amount, type = '') {
+  const el = document.createElement('div');
+  el.className = `dmg-num ${type}`;
+  el.textContent = typeof amount === 'string' ? amount : Math.ceil(amount);
+  el.style.left = `${x + (Math.random() - 0.5) * 20}px`;
+  el.style.top = `${y - 10}px`;
+  damageLayer.appendChild(el);
+  setTimeout(() => el.remove(), 800);
+}
+
+// ═══════════════ 事件监听 ═══════════════
+G.events.on('enemy:death', (data) => {
+  const e = data.enemy;
+  // 魅惑友军阵亡：不计分，但分裂/自爆技能照常（作用于敌方）
+  if (e.charmed) {
+    G.particles.deathBurst(e.x, e.y, '#6f8', e.radius);
+    if (e.traits.includes('splitter') && e.splitCount > 0) G.waveManager.spawnSplits(e, true);
+    if (e.traits.includes('explosive')) {
+      G.particles.explosion(e.x, e.y, '#6f8', 60);
+      const act = G.enemyPool.active;
+      for (let i = 0; i < act.length; i++) {
+        const o = act[i];
+        if (!o.alive || o.charmed || o === e) continue;
+        if (G.dist(e.x, e.y, o.x, o.y) < 80) o.takeDamage(30, G.events, true);
+      }
+    }
+    return;
+  }
+  addCombo();
+  const scoreGain = Math.floor(e.scoreValue * G.combo.multiplier);
+  G.gameData.score += scoreGain;
+  G.gameData.kills++;
+  G.waveManager.onEnemyKilled();
+
+  G.particles.deathBurst(e.x, e.y, e.color, e.radius);
+  G.shake.trigger(4, 0.12);
+
+  if (G.combo.count >= 3) {
+    showDamageNumber(e.x, e.y - 20, `x${G.combo.multiplier} COMBO!`, 'crit');
+    G.shake.trigger(6, 0.15);
+  }
+
+  if (e.absorbed) {
+    // 封印吸收：静默死亡，不触发分裂/自爆
+    showDamageNumber(e.x, e.y, scoreGain, 'crit');
+    return;
+  }
+
+  if (e.traits.includes('splitter') && e.splitCount > 0) G.waveManager.spawnSplits(e);
+
+  if (e.traits.includes('explosive')) {
+    const d = G.dist(e.x, e.y, G.player.x, G.player.y);
+    if (d < 80 && G.player.invincible <= 0) {
+      G.player.takeDamage(30, G.events, e.x, e.y);
+      G.shake.trigger(8, 0.2);
+    }
+    G.particles.explosion(e.x, e.y, '#f80', 60);
+  }
+
+  showDamageNumber(e.x, e.y, scoreGain, 'crit');
+});
+
+G.events.on('enemy:hit', (data) => {
+  showDamageNumber(data.enemy.x, data.enemy.y, data.damage);
+  G.hitStop.trigger(0.02, 0.3);
+});
+
+G.events.on('enemy:shieldHit', (data) => {
+  showDamageNumber(data.enemy.x, data.enemy.y, data.absorbed, 'heal');
+});
+
+G.events.on('enemy:charmed', (data) => {
+  showDamageNumber(data.enemy.x, data.enemy.y, '♥ ' + G.t('fx_charmed'), 'heal');
+});
+
+G.events.on('enemy:downed', (data) => {
+  showDamageNumber(data.enemy.x, data.enemy.y, G.t('fx_downed'), 'crit');
+});
+
+G.events.on('enemy:revive', (data) => {
+  showDamageNumber(data.enemy.x, data.enemy.y, G.t('fx_revived'), 'crit');
+  G.particles.explosion(data.enemy.x, data.enemy.y, '#2cc', data.enemy.radius);
+});
+
+G.events.on('player:lifesteal', (data) => {
+  showDamageNumber(G.player.x, G.player.y - 16, '+' + Math.ceil(data.amount), 'heal');
+});
+
+G.events.on('player:hit', (data) => {
+  G.shake.trigger(6, 0.15);
+  G.particles.emit(G.player.x, G.player.y, {
+    count: 10, color: '#f44', speedMin: 80, speedMax: 200, lifeMin: 0.2, lifeMax: 0.5,
+  });
+});
+
+G.events.on('player:death', () => {
+  // 复苏基因：死亡时以50%血量复活一次（消耗该基因）
+  if (G.hasGene('reviver') && G.player) {
+    delete G.geneBuffs.reviver;
+    G.player.alive = true;
+    G.player.hp = Math.ceil(G.player.maxHp * 0.5);
+    G.player.invincible = 2;
+    G.particles.explosion(G.player.x, G.player.y, '#2cc', 60);
+    showDamageNumber(G.player.x, G.player.y - 30, G.t('fx_revived'), 'heal');
+    return;
+  }
+  G.gameData.state = G.State.GAMEOVER;
+  G.particles.deathBurst(G.player.x, G.player.y, '#4af', 30);
+  G.shake.trigger(15, 0.5);
+  showGameOver();
+});
+
+// 基因反应：受击时触发爆燃反击/闪现闪避
+G.events.on('player:hit', (d) => {
+  if (!(d.damage > 0) || !G.player || !G.player.alive) return;
+  // 爆燃基因：受击反击周围敌人
+  if (G.hasGene('explosive')) {
+    const act = G.enemyPool.active;
+    for (let i = 0; i < act.length; i++) {
+      const e = act[i];
+      if (!e.alive || e.charmed) continue;
+      if (G.dist(G.player.x, G.player.y, e.x, e.y) < 80 + e.radius) e.takeDamage(30, G.events);
+    }
+    G.particles.explosion(G.player.x, G.player.y, '#f80', 50);
+    G.shake.trigger(6, 0.15);
+  }
+  // 闪现基因：受击向移动方向瞬移150px
+  if (G.hasGene('teleporter')) {
+    const mv = G.input.movement;
+    const a = (Math.abs(mv.x) + Math.abs(mv.y)) > 0 ? Math.atan2(mv.y, mv.x) : G.RAND() * G.TWO_PI;
+    G.particles.explosion(G.player.x, G.player.y, '#a4f', 26);
+    G.player.x = G.clamp(G.player.x + Math.cos(a) * 150, G.player.radius, G.renderer.width - G.player.radius);
+    G.player.y = G.clamp(G.player.y + Math.sin(a) * 150, G.player.radius, G.renderer.height - G.player.radius);
+    G.particles.explosion(G.player.x, G.player.y, '#a4f', 26);
+  }
+});
+
+// 基因夺取：浮字提示
+G.events.on('gene:gained', (d) => {
+  if (typeof d.x === 'number') {
+    showDamageNumber(d.x, d.y - 20, `${G.t('gene_' + d.trait)} +${Math.round(d.duration)}s`, 'heal');
+  }
+});
+
+// 育母之巢：每5秒召唤敌人
+G.events.on('nest:spawn', (d) => {
+  if (G.waveManager) G.waveManager.summonFromNest(d.enemy);
+});
+
+G.events.on('wave:start', (data) => {
+  G.gameData.wave = data.wave;
+  const el = document.getElementById('wave-announce');
+  document.getElementById('wave-num').textContent = data.wave;
+  document.getElementById('wave-sub').textContent =
+    data.wave % 5 === 0 ? '⚠ BOSS WAVE ⚠' : `${data.enemyCount} enemies incoming`;
+  el.classList.remove('hidden');
+  el.style.animation = 'none'; el.offsetHeight; el.style.animation = '';
+  setTimeout(() => el.classList.add('hidden'), 2500);
+});
+
+G.events.on('wave:complete', (data) => {
+  // 每过一关获得1点加点
+  loadout.availablePoints = Math.min(G.POINT_TOTAL, loadout.availablePoints + 1);
+  // 暂停下一波次，弹出加点界面
+  G.waveManager.pauseBetweenWaves = true;
+  showWaveAlloc();
+});
+
+// ═══════════════ 碰撞检测 ═══════════════
+function checkCollisions() {
+  const bullets = G.bulletPool.active;
+  const enemies = G.enemyPool.active;
+
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    if (!b.alive) continue;
+    for (let j = 0; j < enemies.length; j++) {
+      const e = enemies[j];
+      if (!e.alive || e.charmed || b.hitEnemies.has(e)) continue;
+      if (e.phaseShift > 0) continue; // 相位中不可命中
+      if (G.dist(b.x, b.y, e.x, e.y) < b.radius + e.radius) {
+        G.weaponSystem.handleBulletHit(b, e);
+        if (!b.alive) break;
+      }
+    }
+  }
+
+  // 敌人碰触玩家
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (!e.alive || e.charmed) continue;
+    if (G.dist(e.x, e.y, G.player.x, G.player.y) < e.radius + G.player.radius) {
+      const reflected = G.player.takeDamage(20, G.events, e.x, e.y);
+      // 反伤
+      if (reflected > 0 && e.alive) {
+        e.takeDamage(reflected, G.events);
+        showDamageNumber(e.x, e.y, reflected, 'heal');
+      }
+      // 棘壳基因：碰触玩家的敌人受伤
+      if (G.hasGene('bubble') && e.alive) e.takeDamage(20, G.events);
+      // 蜂群自爆
+      if (e.traits.includes('swarm')) {
+        e.alive = false;
+        G.particles.explosion(e.x, e.y, e.color, 20);
+        G.events.emit('enemy:death', { enemy: e });
+      }
+      const ang = G.angle(e.x, e.y, G.player.x, G.player.y);
+      G.player.vx += Math.cos(ang) * 200;
+      G.player.vy += Math.sin(ang) * 200;
+    }
+  }
+
+  // 敌人碰触无人机：无人机受伤（死亡后由母船重生）
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (!e.alive || e.charmed) continue;
+    for (let k = 0; k < G.drones.length; k++) {
+      const dr = G.drones[k];
+      if (!dr.alive) continue;
+      if (G.dist(e.x, e.y, dr.x, dr.y) < e.radius + dr.radius) {
+        dr.takeDamage(10, G.events);
+        G.particles.hitSpark(dr.x, dr.y, '#6cf');
+        // 无人机对敌接触伤害：方式与敌人碰玩家一致（20伤害+击退，蜂群自爆）
+        if (dr.contactCd <= 0 && e.alive && !e.charmed && e.phaseShift <= 0) {
+          dr.contactCd = 0.5;
+          if (e.traits.includes('swarm')) {
+            e.alive = false;
+            G.particles.explosion(e.x, e.y, e.color, 20);
+            G.events.emit('enemy:death', { enemy: e });
+          } else {
+            e.takeDamage(20, G.events);
+          }
+          const ang2 = G.angle(dr.x, dr.y, e.x, e.y);
+          e.x += Math.cos(ang2) * 8; e.y += Math.sin(ang2) * 8;
+          e.vx += Math.cos(ang2) * 80; e.vy += Math.sin(ang2) * 80;
+          G.particles.hitSpark(e.x, e.y, '#9cf');
+        }
+      }
+    }
+  }
+
+  // 敌人碰触防御无人机：防御机替母船抵挡伤害（反伤/反应装甲继承自母船，不可主动攻击）
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (!e.alive || e.charmed) continue;
+    for (let k = 0; k < G.guards.length; k++) {
+      const g = G.guards[k];
+      if (!g.alive || g.contactCd > 0) continue;
+      if (G.dist(e.x, e.y, g.x, g.y) < e.radius + g.radius) {
+        g.contactCd = 0.5;
+        const reflected = g.takeDamage(20, G.events, e.x, e.y); // 与敌碰母船一致的接触伤害
+        if (reflected > 0 && e.alive) {
+          e.takeDamage(reflected, G.events);
+          showDamageNumber(e.x, e.y, reflected, 'heal');
+        }
+        // 防御机普通撞击伤害：与战斗无人机一致（20伤害，蜂群自爆）
+        if (e.alive && !e.charmed && e.phaseShift <= 0) {
+          if (e.traits.includes('swarm')) {
+            e.alive = false;
+            G.particles.explosion(e.x, e.y, e.color, 20);
+            G.events.emit('enemy:death', { enemy: e });
+          } else {
+            e.takeDamage(20, G.events);
+          }
+          G.particles.hitSpark(e.x, e.y, '#9cf');
+        }
+        // 棘壳基因：碰触防御机的敌人同样受伤
+        if (G.hasGene('bubble') && e.alive) e.takeDamage(20, G.events);
+        // 蜂群自爆
+        if (e.alive && e.traits.includes('swarm')) {
+          e.alive = false;
+          G.particles.explosion(e.x, e.y, e.color, 20);
+          G.events.emit('enemy:death', { enemy: e });
+        }
+        // 敌人被弹开，避免贴身黏住
+        if (e.alive) {
+          const ang = G.angle(g.x, g.y, e.x, e.y);
+          e.x += Math.cos(ang) * 8; e.y += Math.sin(ang) * 8;
+          e.vx += Math.cos(ang) * 120; e.vy += Math.sin(ang) * 120;
+        }
+        G.particles.hitSpark(g.x, g.y, '#4dd');
+      }
+    }
+  }
+
+  // 敌人碰触进攻无人机：进攻机只受伤害，不对敌造成碰撞伤害；规避中（含冲锋自动规避）直接穿透，不发生碰撞
+  for (let j = 0; j < enemies.length; j++) {
+    const e = enemies[j];
+    if (!e.alive || e.charmed) continue;
+    for (let k = 0; k < G.strikers.length; k++) {
+      const st = G.strikers[k];
+      if (!st.alive) continue;
+      if (G.dist(e.x, e.y, st.x, st.y) < e.radius + st.radius) {
+        if (st.state === 'charge' || st.evadeTimer > 0) continue; // 规避中穿透敌人
+        st.takeDamage(10, G.events);
+        G.particles.hitSpark(st.x, st.y, '#f84');
+      }
+    }
+  }
+
+  // 魅惑友军碰触敌人：互相造成接触伤害
+  for (let j = 0; j < enemies.length; j++) {
+    const ally = enemies[j];
+    if (!ally.alive || !ally.charmed || ally.allyHitCd > 0) continue;
+    for (let k = 0; k < enemies.length; k++) {
+      const foe = enemies[k];
+      if (!foe.alive || foe.charmed || foe.phaseShift > 0) continue;
+      if (G.dist(ally.x, ally.y, foe.x, foe.y) < ally.radius + foe.radius) {
+        foe.takeDamage(20, G.events); // 与原敌人接触伤害一致
+        // 相位中闪避反击；反射者正面减伤50%
+        if (ally.phaseShift <= 0) {
+          ally.takeDamage(ally.traits.includes('reflector') ? 10 : 20, G.events, true); // 敌方反击魅惑友军
+        }
+        ally.allyHitCd = 0.5;
+        G.particles.hitSpark(foe.x, foe.y, '#6f8');
+        break;
+      }
+    }
+  }
+}
+
+// ═══════════════ 主循环 ═══════════════
+function update(dt) {
+  if (G.gameData.state !== G.State.PLAYING) return;
+  if (G.gameData.paused) return;
+
+  const timeScale = G.hitStop.update(dt);
+  const scaledDt = dt * timeScale;
+
+  G.player.update(scaledDt, G.input, G.events);
+  G.geneUpdate(scaledDt); // 基因buff倒计时与相位基因触发
+  G.updateDrones(scaledDt); // 无人机跟随准星并攻击
+  G.updateGuards(scaledDt); // 防御无人机环绕护卫
+  G.updateStrikers(scaledDt); // 进攻无人机冲锋攻击
+
+  // 射击 — 使用唯一武器（狂暴基因：射速+30%；无人机/进攻无人机加点时关闭基础射击，由无人机代发）
+  if (G.player.fireCooldown <= 0 && G.input.shooting && G.weaponSystem.weapon && G.weaponSystem.weapon.droneCount <= 0 && G.weaponSystem.weapon.strikerCount <= 0) {
+    G.weaponSystem.fire(G.player, G.input.mouse.x, G.input.mouse.y);
+    G.player.fireCooldown = 1 / G.weaponSystem.weapon.fireRate / (G.hasGene('swarm') ? 1.3 : 1);
+  }
+
+  G.enemyPool.update(scaledDt, (e, dt) => e.update(dt, G.player.x, G.player.y, G.events, G.enemyPool.active));
+  G.bulletPool.update(scaledDt, (b, dt) => b.update(dt, G.enemyPool.active, G.events));
+  G.weaponSystem.update(scaledDt, G.enemyPool.active, G.player);
+  G.particles.update(scaledDt);
+  updateCombo(dt);
+  checkCollisions();
+  G.waveManager.update(dt);
+  G.shake.update(dt);
+  updateHUD();
+  G.input.endFrame();
+}
+
+function render(time) {
+  const ctx = G.renderer.ctx;
+  G.renderer.clear();
+  G.renderer.applyShake(G.shake);
+  G.renderer.drawBackground(time);
+
+  if (G.gameData.state !== G.State.PLAYING && G.gameData.state !== G.State.GAMEOVER) return;
+
+  G.weaponSystem.drawEffects(ctx, time);
+
+  const enemies = G.enemyPool.active;
+  for (let i = 0; i < enemies.length; i++) enemies[i].draw(ctx, time);
+
+  const bullets = G.bulletPool.active;
+  for (let i = 0; i < bullets.length; i++) bullets[i].draw(ctx, time);
+
+  if (G.player && G.player.alive) G.player.draw(ctx, time);
+
+  G.drawDrones(ctx, time);
+  G.drawGuards(ctx, time);
+  G.drawStrikers(ctx, time);
+
+  G.particles.draw(ctx, time);
+
+  // 连杀
+  if (G.combo.count >= 3) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const pulse = 1 + Math.sin(time * 8) * 0.05;
+    ctx.font = `bold ${28 * pulse}px 'Segoe UI', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = G.combo.count >= 10 ? '#f44' : G.combo.count >= 6 ? '#fa4' : '#ff4';
+    ctx.shadowColor = ctx.fillStyle;
+    ctx.shadowBlur = 15;
+    ctx.fillText(`${G.combo.count} COMBO x${G.combo.multiplier}`, G.renderer.centerX, 80);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
+  // 准星
+  if (G.player && G.player.alive) {
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    const mx = G.input.mouse.x, my = G.input.mouse.y;
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1.5;
+    const sz = 12;
+    ctx.beginPath(); ctx.arc(mx, my, sz, 0, G.TWO_PI); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(mx-sz-4,my); ctx.lineTo(mx-sz+4,my);
+    ctx.moveTo(mx+sz-4,my); ctx.lineTo(mx+sz+4,my);
+    ctx.moveTo(mx,my-sz-4); ctx.lineTo(mx,my-sz+4);
+    ctx.moveTo(mx,my+sz-4); ctx.lineTo(mx,my+sz+4);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,100,100,0.8)';
+    ctx.beginPath(); ctx.arc(mx, my, 2, 0, G.TWO_PI); ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ═══════════════ HUD ═══════════════
+function updateHUD() {
+  document.getElementById('hud-wave').textContent = G.gameData.wave;
+  document.getElementById('hud-score').textContent = G.gameData.score;
+  document.getElementById('hud-kills').textContent = G.gameData.kills;
+  // 显示可用点数
+  const used = getUsedPoints();
+  const freePoints = loadout.availablePoints - used;
+  document.getElementById('hud-points').textContent = freePoints > 0 ? `+${freePoints}` : '0';
+  document.getElementById('hud-points').style.color = freePoints > 0 ? '#4f4' : '#adf';
+  if (G.player) {
+    const pct = (G.player.hp / G.player.maxHp) * 100;
+    document.getElementById('hp-bar').style.width = `${pct}%`;
+    document.getElementById('hp-text').textContent = `${Math.ceil(G.player.hp)} / ${G.player.maxHp}`;
+    // 护盾显示
+    const shieldEl = document.getElementById('shield-bar');
+    if (shieldEl) {
+      if (G.player.maxShield > 0 || G.player.shield > 0) {
+        shieldEl.style.display = 'block';
+        const cap = Math.max(G.player.maxShield, G.player.shield);
+        shieldEl.style.width = `${Math.min(100, (G.player.shield / cap) * 100)}%`;
+      } else {
+        shieldEl.style.display = 'none';
+      }
+    }
+  }
+  if (G.weaponSystem.weapon) {
+    document.getElementById('hud-weapon').textContent = G.weaponSystem.weapon.name;
+  }
+  updateGeneBar();
+}
+
+// ═══════════════ 基因buff栏 ═══════════════
+let lastGeneSig = null;
+function updateGeneBar() {
+  const bar = document.getElementById('gene-bar');
+  if (!bar) return;
+  const keys = Object.keys(G.geneBuffs).sort();
+  const sig = keys.join(',');
+  if (sig !== lastGeneSig) {
+    lastGeneSig = sig;
+    bar.innerHTML = '';
+    for (const t of keys) {
+      const m = G.GeneMeta[t] || { icon: 'gene', color: '#adf' };
+      const chip = document.createElement('div');
+      chip.className = 'gene-chip';
+      chip.style.borderColor = m.color;
+      chip.title = G.t('gene_' + t);
+      chip.innerHTML = `${G.icon(m.icon, m.color)}<b id="gene-sec-${t}"></b>`;
+      bar.appendChild(chip);
+    }
+  }
+  for (const t of keys) {
+    const el = document.getElementById('gene-sec-' + t);
+    if (el) el.textContent = Math.ceil(G.geneBuffs[t]) + 's';
+  }
+}
+
+// ═══════════════ 装备系统（统一点数池） ═══════════════
+const loadout = {
+  weaponPoints: { power:1, rate:1, pierce:0, homing:0, burst:0, split:0, lifetime:1, dot:0, zone:0, bounce:0, burn:0, freeze:0, shock:0, lifesteal:0, knockback:0, seal:0, charm:0, drone:0, striker:0 },
+  shipPoints: { hull:1, regen:0, reflect:0, shield:0, reactive:0, guard:0 },
+  activePreset: null,
+  availablePoints: G.POINT_START, // 战前可用点数
+};
+
+function getUsedPoints() {
+  return Object.values(loadout.weaponPoints).reduce((s,v) => s+v, 0)
+       + Object.values(loadout.shipPoints).reduce((s,v) => s+v, 0);
+}
+
+// ═══════════════ 加点卡牌系统 ═══════════════
+const cardColors = {
+  power:'#f44', rate:'#4af', pierce:'#fa4', homing:'#c4f', burst:'#f84',
+  split:'#f4c', lifetime:'#4fd', dot:'#9d4', zone:'#f44', bounce:'#8f4',
+  burn:'#f60', freeze:'#4cf', shock:'#84f',
+  lifesteal:'#f6a', knockback:'#fd4', seal:'#a6f', charm:'#f6c', drone:'#6cf', striker:'#8f4',
+  hull:'#f44', regen:'#4f4', reflect:'#fa4', shield:'#4af', reactive:'#fd8', guard:'#4dd',
+};
+const ALL_ALLOC_KEYS = [...Object.keys(G.StatMeta), ...Object.keys(G.ShipMeta)];
+
+function getStatVal(key) {
+  return key in loadout.weaponPoints ? loadout.weaponPoints[key] : loadout.shipPoints[key];
+}
+
+// 随机卡牌池：已加点属性必出现（点数高者优先），其余随机补足 count 项
+function rollStatPool(count) {
+  const withPts = ALL_ALLOC_KEYS.filter(k => getStatVal(k) > 0).sort((a, b) => getStatVal(b) - getStatVal(a));
+  const rest = ALL_ALLOC_KEYS.filter(k => getStatVal(k) === 0);
+  for (let i = rest.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [rest[i], rest[j]] = [rest[j], rest[i]];
+  }
+  return [...withPts, ...rest].slice(0, count);
+}
+
+// 渲染单张加点卡牌（pfx 区分战前/波次弹窗的元素 id）
+function renderStatCard(pfx, key, onClick) {
+  const sys = key in G.StatMeta ? 'weapon' : 'ship';
+  const meta = G.StatMeta[key] || G.ShipMeta[key];
+  const color = cardColors[key] || '#4af';
+  const val = getStatVal(key);
+  const card = document.createElement('div');
+  card.className = 'stat-card' + (val > 0 ? ' has-pts' : '');
+  card.id = `${pfx}card-${key}`;
+  card.style.setProperty('--card-color', color);
+  card.innerHTML = `
+    <div class="stat-card-head">
+      <span class="stat-card-icon">${G.icon(meta.icon, color)}</span>
+      <span class="stat-card-name">${G.t(meta.label)}</span>
+      ${sys === 'ship' ? `<span class="stat-card-tag">${G.t('ship_tag')}</span>` : ''}
+      <span class="stat-card-val" id="${pfx}val-${key}">${val}</span>
+    </div>
+    <div class="stat-card-desc">${G.t(meta.desc)}</div>
+    <div class="stat-card-bar-wrap"><div class="stat-card-bar" id="${pfx}bar-${key}" style="width:${(val/G.POINT_MAX)*100}%;background:${color}"></div></div>
+    <div class="stat-card-btns">
+      <button class="alloc-btn" data-dir="-1">−</button>
+      <button class="alloc-btn" data-dir="1">+</button>
+    </div>`;
+  card.querySelectorAll('.alloc-btn').forEach(btn => {
+    btn.onclick = () => onClick(sys, key, parseInt(btn.dataset.dir));
+  });
+  return card;
+}
+
+// 刷新指定前缀下所有卡牌的数值/进度条/高亮
+function updateCards(pfx) {
+  for (const key of ALL_ALLOC_KEYS) {
+    const el = document.getElementById(`${pfx}val-${key}`);
+    if (!el) continue;
+    const val = getStatVal(key);
+    el.textContent = val;
+    const bar = document.getElementById(`${pfx}bar-${key}`);
+    if (bar) bar.style.width = `${(val / G.POINT_MAX) * 100}%`;
+    const card = document.getElementById(`${pfx}card-${key}`);
+    if (card) card.classList.toggle('has-pts', val > 0);
+  }
+}
+
+function buildLoadout() {
+  const row = document.getElementById('preset-row');
+  row.innerHTML = '';
+  for (const [key, preset] of Object.entries(G.WeaponPresets)) {
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.innerHTML = `${G.icon(preset.icon, '#8cf')} ${G.t('preset_' + key)}`;
+    btn.dataset.key = key;
+    btn.onclick = () => selectPreset(key);
+    row.appendChild(btn);
+  }
+
+  // 初始随机20张加点卡牌（语言切换/重进时保持同一套随机结果）
+  if (!loadout.cardPool) loadout.cardPool = rollStatPool(G.INIT_CARD_COUNT);
+  renderLoadoutCards();
+
+  refreshLoadoutUI();
+  startPreviewLoop();
+}
+
+function renderLoadoutCards() {
+  const grid = document.getElementById('card-grid');
+  grid.innerHTML = '';
+  for (const key of loadout.cardPool) grid.appendChild(renderStatCard('c', key, allocPoint));
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.key === loadout.activePreset);
+  });
+}
+
+function selectPreset(key) {
+  const preset = G.WeaponPresets[key];
+  if (!preset) return;
+  // 使用权重系统自动分配点数
+  const weaponPoints = G.buildPresetPoints(key, loadout.availablePoints);
+  if (!weaponPoints) return;
+  loadout.weaponPoints = weaponPoints;
+  loadout.shipPoints = { hull: 1, regen: 0, reflect: 0, shield: 0, reactive: 0, guard: 0 };
+  loadout.activePreset = key;
+  // 模板可突破随机卡牌池限制：所有获得点数的属性补发卡牌
+  for (const k of ALL_ALLOC_KEYS) {
+    if (getStatVal(k) > 0 && !loadout.cardPool.includes(k)) loadout.cardPool.push(k);
+  }
+  renderLoadoutCards();
+  refreshLoadoutUI();
+}
+
+function allocPoint(sys, key, dir) {
+  const pts = sys === 'weapon' ? loadout.weaponPoints : loadout.shipPoints;
+  const used = getUsedPoints();
+
+  if (dir > 0 && used >= loadout.availablePoints) return;
+  if (dir > 0 && pts[key] >= G.POINT_MAX) return;
+  if (dir < 0 && pts[key] <= 0) return;
+
+  pts[key] += dir;
+  if (sys === 'weapon') loadout.activePreset = null;
+  refreshLoadoutUI();
+}
+
+function refreshLoadoutUI() {
+  const used = getUsedPoints();
+  document.getElementById('points-remain').textContent = loadout.availablePoints - used;
+  document.getElementById('points-total').textContent = loadout.availablePoints;
+
+  updateCards('c');
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.key === loadout.activePreset);
+  });
+
+  // 武器预览
+  const weapon = G.buildWeaponFromPoints(loadout.weaponPoints);
+  document.getElementById('preview-name').textContent = weapon.name;
+  document.getElementById('preview-name').style.color = weapon.color;
+
+  const stats = document.getElementById('preview-stats');
+  stats.innerHTML = `
+    <div class="ps-row"><span>${G.t('preview_damage')}</span><span class="ps-val">${weapon.damage.toFixed(0)}</span></div>
+    <div class="ps-row"><span>${G.t('preview_rate')}</span><span class="ps-val">${weapon.fireRate.toFixed(1)}/s</span></div>
+    <div class="ps-row"><span>${G.t('preview_pierce')}</span><span class="ps-val">${weapon.penetration}</span></div>
+    <div class="ps-row"><span>${G.t('preview_homing')}</span><span class="ps-val">${(weapon.homing*100).toFixed(0)}%</span></div>
+    <div class="ps-row"><span>${G.t('preview_burst')}</span><span class="ps-val">${weapon.burst}</span></div>
+    <div class="ps-row"><span>${G.t('preview_split')}</span><span class="ps-val">${weapon.split}</span></div>
+    <div class="ps-row"><span>${G.t('preview_lifetime')}</span><span class="ps-val">${weapon.maxLife.toFixed(1)}s</span></div>
+    <div class="ps-row"><span>${G.t('preview_dot')}</span><span class="ps-val">4/s × ${weapon.dot.toFixed(0)}s</span></div>
+    <div class="ps-row"><span>${G.t('preview_zone')}</span><span class="ps-val">${weapon.zoneRadius.toFixed(0)}</span></div>
+    <div class="ps-row"><span>${G.t('preview_bounce')}</span><span class="ps-val">${weapon.bounce}</span></div>
+    <div class="ps-row"><span>${G.t('preview_burn')}</span><span class="ps-val">${weapon.burnDps.toFixed(0)}~${(weapon.burnDps * 6).toFixed(0)}/s</span></div>
+    <div class="ps-row"><span>${G.t('preview_freeze')}</span><span class="ps-val">+${weapon.freezePower.toFixed(0)}%</span></div>
+    <div class="ps-row"><span>${G.t('preview_shock')}</span><span class="ps-val">×${weapon.shockPoints}</span></div>
+    <div class="ps-row"><span>${G.t('preview_drone')}</span><span class="ps-val">${weapon.droneCount > 0 ? '×' + weapon.droneCount : '—'}</span></div>
+    <div class="ps-row"><span>${G.t('preview_striker')}</span><span class="ps-val">${weapon.strikerCount > 0 ? '×' + weapon.strikerCount : '—'}</span></div>
+  `;
+
+  // 飞船预览
+  const ship = G.buildShipFromPoints(loadout.shipPoints);
+  const sStats = document.getElementById('ship-stats');
+  sStats.innerHTML = `
+    <div class="ps-row"><span>${G.t('preview_hp')}</span><span class="ps-val">${ship.maxHp}</span></div>
+    <div class="ps-row"><span>${G.t('preview_regen')}</span><span class="ps-val">${ship.regen.toFixed(0)}/s</span></div>
+    <div class="ps-row"><span>${G.t('preview_reflect')}</span><span class="ps-val">${ship.reflect.toFixed(0)}</span></div>
+    <div class="ps-row"><span>${G.t('preview_shield')}</span><span class="ps-val">${ship.maxShield}</span></div>
+    <div class="ps-row"><span>${G.t('preview_reactive')}</span><span class="ps-val">${ship.reactive > 0 ? '×' + ship.reactive : '—'}</span></div>
+    <div class="ps-row"><span>${G.t('preview_guard')}</span><span class="ps-val">${ship.guard > 0 ? '×' + ship.guard : '—'}</span></div>
+  `;
+
+  const shapeNames = { orb: G.t('shape_orb'), streak: G.t('shape_streak'), needle: G.t('shape_needle'),
+    crescent: G.t('shape_crescent'), star: G.t('shape_star'), cluster: G.t('shape_cluster'), dart: G.t('shape_dart') };
+  document.getElementById('preview-shape').textContent =
+    `${G.t('shape_label')}: ${shapeNames[weapon.bulletShape.primary]||'?'} ${weapon.bulletShape.blend>0.3?'+ '+(shapeNames[weapon.bulletShape.secondary]||''):''}`;
+}
+
+// ── 预览Canvas循环 ──
+let previewRAF = null;
+function startPreviewLoop() {
+  const pCanvas = document.getElementById('preview-canvas');
+  const pCtx = pCanvas.getContext('2d');
+
+  function drawPreview(time) {
+    const t = time / 1000;
+    pCtx.clearRect(0, 0, 240, 240);
+
+    // ── 子弹预览（上半部分） ──
+    const weapon = G.buildWeaponFromPoints(loadout.weaponPoints);
+    const r = Math.max(8, weapon.bulletRadius * 3);
+    const angle = t * 1.5;
+    G.drawBulletShape(pCtx, 120, 70, angle, r, weapon.bulletShape, weapon.color, t);
+
+    // 子弹轨道粒子
+    for (let i = 0; i < 3; i++) {
+      const a = t * 2 + i * (G.TWO_PI / 3);
+      const d = 35 + Math.sin(t * 3 + i) * 8;
+      pCtx.fillStyle = weapon.color; pCtx.globalAlpha = 0.3;
+      pCtx.beginPath(); pCtx.arc(120 + Math.cos(a)*d, 70 + Math.sin(a)*d, 2, 0, G.TWO_PI); pCtx.fill();
+    }
+    pCtx.globalAlpha = 1;
+
+    // ── 分割线 ──
+    pCtx.strokeStyle = 'rgba(100,150,220,0.2)'; pCtx.lineWidth = 1;
+    pCtx.beginPath(); pCtx.moveTo(30, 135); pCtx.lineTo(210, 135); pCtx.stroke();
+
+    // ── 飞船预览（下半部分） ──
+    const ship = G.buildShipFromPoints(loadout.shipPoints);
+    pCtx.save();
+    pCtx.translate(120, 185);
+    const s = ship.visual.scale * 0.7;
+    pCtx.scale(s, s);
+
+    // 简单三角飞船（朝上）
+    const shipColor = ship.visual.color;
+
+    // 引擎光
+    const flameLen = 8 + Math.sin(t * 12) * 3;
+    const fGrad = pCtx.createLinearGradient(0, 14, 0, 14 + flameLen);
+    fGrad.addColorStop(0, 'rgba(100,180,255,0.8)');
+    fGrad.addColorStop(1, 'rgba(0,100,255,0)');
+    pCtx.fillStyle = fGrad;
+    pCtx.beginPath(); pCtx.moveTo(-4, 14); pCtx.lineTo(0, 14+flameLen); pCtx.lineTo(4, 14); pCtx.closePath(); pCtx.fill();
+
+    // 主体三角
+    pCtx.shadowColor = shipColor; pCtx.shadowBlur = 10;
+    const bodyGrad = pCtx.createLinearGradient(0, -20, 0, 14);
+    bodyGrad.addColorStop(0, '#fff');
+    bodyGrad.addColorStop(0.3, shipColor);
+    bodyGrad.addColorStop(1, 'rgba(0,0,0,0.5)');
+    pCtx.fillStyle = bodyGrad;
+    pCtx.beginPath();
+    pCtx.moveTo(0, -20); pCtx.lineTo(-14, 14); pCtx.lineTo(14, 14);
+    pCtx.closePath(); pCtx.fill();
+    pCtx.shadowBlur = 0;
+
+    // 核心点
+    pCtx.fillStyle = '#fff'; pCtx.globalAlpha = 0.8;
+    pCtx.beginPath(); pCtx.arc(0, 0, 3, 0, G.TWO_PI); pCtx.fill();
+    pCtx.globalAlpha = 1;
+
+    // 护盾环
+    if (ship.visual.hasShield) {
+      pCtx.strokeStyle = `rgba(80,180,255,${0.4+0.3*Math.sin(t*4)})`;
+      pCtx.lineWidth = 2;
+      pCtx.beginPath(); pCtx.arc(0, 0, 22, 0, G.TWO_PI); pCtx.stroke();
+    }
+    // 反伤尖刺
+    if (ship.visual.hasSpikes) {
+      pCtx.fillStyle = `rgba(255,160,60,${0.6+0.3*Math.sin(t*5)})`;
+      const spikeAngles = [-0.4, 0.4, Math.PI*0.7, -Math.PI*0.7];
+      for (const sa of spikeAngles) {
+        pCtx.beginPath();
+        pCtx.moveTo(Math.cos(sa)*22, Math.sin(sa)*22);
+        pCtx.lineTo(Math.cos(sa-0.15)*15, Math.sin(sa-0.15)*15);
+        pCtx.lineTo(Math.cos(sa+0.15)*15, Math.sin(sa+0.15)*15);
+        pCtx.closePath(); pCtx.fill();
+      }
+    }
+    // 回复光环
+    if (ship.visual.hasAura) {
+      pCtx.strokeStyle = `rgba(80,255,120,${0.2+0.1*Math.sin(t*4)})`;
+      pCtx.lineWidth = 1;
+      pCtx.beginPath(); pCtx.arc(0, 0, 26+Math.sin(t*2)*3, 0, G.TWO_PI); pCtx.stroke();
+    }
+
+    pCtx.restore();
+    previewRAF = requestAnimationFrame(drawPreview);
+  }
+  if (previewRAF) cancelAnimationFrame(previewRAF);
+  previewRAF = requestAnimationFrame(drawPreview);
+}
+
+// ═══════════════ 开始/结束 ═══════════════
+function startGame() {
+  document.getElementById('loadout-screen').classList.add('hidden');
+  document.getElementById('gameover-screen').classList.add('hidden');
+  document.body.classList.remove('menu-active');
+  if (previewRAF) { cancelAnimationFrame(previewRAF); previewRAF = null; }
+
+  // 构建武器
+  const weapon = G.buildWeaponFromPoints(loadout.weaponPoints);
+  G.weaponSystem.setWeapon(weapon);
+
+  // 构建飞船
+  const shipConfig = G.buildShipFromPoints(loadout.shipPoints);
+
+  // 重置
+  G.bulletPool.releaseAll();
+  G.enemyPool.releaseAll();
+  G.particles.pool.releaseAll();
+  G.weaponSystem.aoeBlasts = [];
+  G.weaponSystem.blackholes = [];
+  G.weaponSystem.chainLightnings = [];
+  G.weaponSystem.damageZones = [];
+  G.weaponSystem.orbitalBullets = [];
+
+  G.gameData.score = 0;
+  G.gameData.wave = 1;
+  G.gameData.kills = 0;
+  G.gameData.state = G.State.PLAYING;
+  G.gameData.paused = false;
+  G.clearGenes(); // 清除上局残留的基因buff
+  lastGeneSig = null;
+
+  G.player = new G.Player(G.renderer.centerX, G.renderer.centerY, shipConfig);
+  G.player.invincible = 2;
+  G.syncDrones(weapon.droneCount); // 同步无人机数量
+  G.syncGuards(shipConfig.guard); // 同步防御无人机数量
+  G.syncStrikers(weapon.strikerCount); // 同步进攻无人机数量
+  G.waveManager = new G.WaveManager(G.enemyPool, G.events);
+
+  // 轨道弹（bounce > 2 时生成环绕飞船的轨道弹）
+  if (weapon.bounce > 2) {
+    const count = Math.floor(weapon.bounce / 2);
+    for (let i = 0; i < count; i++) {
+      G.weaponSystem.orbitalBullets.push(new G.OrbitalBullet(
+        G.player, 50 + i * 15, (i / count) * G.TWO_PI,
+        3 + i * 0.5, weapon.damage * 0.3, weapon.bulletRadius * 0.8, weapon.color
+      ));
+    }
+  }
+}
+
+// ═══════════════ 波次间加点 ═══════════════
+function showWaveAlloc() {
+  G.gameData.paused = true;
+  document.body.classList.add('menu-active');
+  const overlay = document.getElementById('wave-alloc');
+  overlay.classList.remove('hidden');
+
+  const used = getUsedPoints();
+  const free = loadout.availablePoints - used;
+  document.getElementById('wave-pts').textContent = free;
+
+  // 随机10张加点卡牌（无模板；已加点属性必出现）
+  const pool = rollStatPool(G.WAVE_CARD_COUNT);
+  const grid = document.getElementById('wave-alloc-grid');
+  grid.innerHTML = '';
+  for (const key of pool) grid.appendChild(renderStatCard('wc', key, waveAllocPoint));
+}
+
+function waveAllocPoint(sys, key, dir) {
+  const pts = sys === 'weapon' ? loadout.weaponPoints : loadout.shipPoints;
+  const used = getUsedPoints();
+  if (dir > 0 && used >= loadout.availablePoints) return;
+  if (dir > 0 && pts[key] >= G.POINT_MAX) return;
+  if (dir < 0 && pts[key] <= 0) return;
+  pts[key] += dir;
+
+  // 刷新显示
+  const usedNow = getUsedPoints();
+  const free = loadout.availablePoints - usedNow;
+  document.getElementById('wave-pts').textContent = free;
+  updateCards('wc');
+}
+
+function closeWaveAlloc() {
+  document.getElementById('wave-alloc').classList.add('hidden');
+  G.gameData.paused = false;
+  document.body.classList.remove('menu-active');
+  // 应用飞船属性（如果还活着）
+  if (G.player && G.player.alive) {
+    const ship = G.buildShipFromPoints(loadout.shipPoints);
+    G.player.maxHp = ship.maxHp;
+    G.player.regen = ship.regen;
+    G.player.reflect = ship.reflect;
+    G.player.maxShield = ship.maxShield;
+    G.player.reactive = ship.reactive;
+    G.player.visual = ship.visual;
+    // 重建武器
+    const weapon = G.buildWeaponFromPoints(loadout.weaponPoints);
+    G.weaponSystem.setWeapon(weapon);
+    G.syncDrones(weapon.droneCount); // 同步无人机数量
+    G.syncGuards(ship.guard); // 同步防御无人机数量
+    G.syncStrikers(weapon.strikerCount); // 同步进攻无人机数量
+  }
+  // 恢复波次
+  G.waveManager.pauseBetweenWaves = false;
+  G.waveManager.betweenTimer = 2;
+}
+
+document.getElementById('wave-alloc-continue').addEventListener('click', closeWaveAlloc);
+
+function showGameOver() {
+  document.getElementById('gameover-screen').classList.remove('hidden');
+  document.getElementById('go-wave').textContent = G.gameData.wave;
+  document.getElementById('go-score').textContent = G.gameData.score;
+  document.getElementById('go-kills').textContent = G.gameData.kills;
+  document.body.classList.add('menu-active');
+}
+
+function backToLoadout() {
+  document.getElementById('gameover-screen').classList.add('hidden');
+  document.getElementById('loadout-screen').classList.remove('hidden');
+  document.body.classList.add('menu-active');
+  // 失败后重置点数
+  loadout.availablePoints = G.POINT_START;
+  loadout.weaponPoints = { power:0, rate:0, pierce:0, homing:0, burst:0, split:0, lifetime:0, dot:0, zone:0, bounce:0, burn:0, freeze:0, shock:0, lifesteal:0, knockback:0, seal:0, charm:0, drone:0, striker:0 };
+  loadout.shipPoints = { hull:1, regen:0, reflect:0, shield:0, reactive:0, guard:0 };
+  loadout.activePreset = null;
+  loadout.cardPool = null; // 重新随机一套加点卡牌
+  buildLoadout();
+}
+
+document.getElementById('btn-start').addEventListener('click', startGame);
+document.getElementById('btn-restart').addEventListener('click', backToLoadout);
+
+// ═══════════════ 语言切换 ═══════════════
+document.getElementById('btn-lang').addEventListener('click', () => {
+  const newLang = G.currentLang === 'zh' ? 'en' : 'zh';
+  G.applyLang(newLang);
+  lastGeneSig = null; // 刷新基因栏文案
+  // 重建加点界面（刷新标签）
+  buildLoadout();
+  startPreviewLoop();
+});
+
+// ═══════════════ 初始化装备界面 ═══════════════
+G.applyLang(); // 应用保存的语言
+buildLoadout();
+
+// ═══════════════ 启动 ═══════════════
+G.gameLoop.start(update, render);
+console.log('[Game] 🚀 基因战机 v3 (i18n + wave alloc) 已启动');
+
+
+</script>
+</body>
+</html>
