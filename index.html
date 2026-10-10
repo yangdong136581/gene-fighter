@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="x-ogp-key" content="ea8e2e0d-3406-45a2-a869-4058b2002275" />
+<script src="https://sdk.play.fun"></script>
 <title>Gene Fighter - 基因战机</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -3961,6 +3963,42 @@ G.WaveManager = class WaveManager {
 console.log('[Game] waves.js loaded');
 
 
+// ===== playfun.js =====
+// ═══════════════════════════════════════════
+// playfun.js — Play.fun (OpenGameProtocol) SDK 集成
+// ═══════════════════════════════════════════
+// (G = window.Game)
+// Play.fun Browser SDK：游玩中累计积分 addPoints()，游戏结束 endGame() 提交。
+// 防御式设计：SDK 未加载（广告拦截/离线/本地双击打开）时保持 no-op，游戏照常运行。
+G.playfun = {
+  sdk: null,
+  ready: false,
+  addPoints() {},
+  endGame() {},
+};
+
+(function initPlayFun() {
+  if (typeof OpenGameSDK === 'undefined') return;
+  try {
+    const sdk = new OpenGameSDK({ ui: { usePointsWidget: true }, logLevel: 'info' });
+    G.playfun.sdk = sdk;
+    sdk.on('OnReady', () => { G.playfun.ready = true; });
+    // SDK 弹出模态框（登录/结算）时暂停、关闭后恢复
+    sdk.on('GamePause', () => { if (G.gameData) G.gameData.paused = true; });
+    sdk.on('GameResume', () => { if (G.gameData) G.gameData.paused = false; });
+    sdk.init({ gameId: '8f2a7e71-987d-46e0-812f-607f1b55b8dd' });
+    G.playfun.addPoints = function (n) {
+      if (G.playfun.ready && n > 0) { try { sdk.addPoints(n); } catch (e) {} }
+    };
+    G.playfun.endGame = async function () {
+      if (G.playfun.ready) { try { await sdk.endGame(); } catch (e) {} }
+    };
+  } catch (e) {
+    console.warn('Play.fun SDK init failed:', e);
+  }
+})();
+
+
 // ===== main.js =====
 // ═══════════════════════════════════════════════════════
 // main.js — 游戏初始化 / 主循环 / UI绑定 / 碰撞检测
@@ -4033,6 +4071,7 @@ G.events.on('enemy:death', (data) => {
   addCombo();
   const scoreGain = Math.floor(e.scoreValue * G.combo.multiplier);
   G.gameData.score += scoreGain;
+  G.playfun.addPoints(scoreGain);
   G.gameData.kills++;
   G.waveManager.onEnemyKilled();
 
@@ -4878,6 +4917,7 @@ function showGameOver() {
   document.getElementById('go-score').textContent = G.gameData.score;
   document.getElementById('go-kills').textContent = G.gameData.kills;
   document.body.classList.add('menu-active');
+  G.playfun.endGame(); // Play.fun：游戏结束提交本局累计积分
 }
 
 function backToLoadout() {
